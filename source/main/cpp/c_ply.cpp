@@ -368,13 +368,13 @@ namespace ncore
             elem->m_name        = read_token(line);
             PlyString str_count = read_token(line);
             elem->m_prop_count  = parse_u32(str_count);
-            // Allocate the array of properties
             elem->m_prop_array = (PlyProperty*)ctxt->m_alloc->alloc(sizeof(PlyProperty) * elem->m_prop_count);
             return elem;
         }
 
         void read_header_property(PlyCtxt* ctxt, PlyElement* elem, s32 prop_index, PlyString& line)
         {
+            ASSERT(elem->m_prop_array != nullptr);
             PlyProperty* prop       = &elem->m_prop_array[prop_index];
             PlyString    type_token = read_token(line);
             if (type_token == "list")
@@ -395,7 +395,11 @@ namespace ncore
             }
         }
 
-        void read_header_obj_info(PlyCtxt* ctxt, PlyString& line) {}
+        void read_header_obj_info(PlyCtxt* ctxt, PlyString& line)
+        {
+            // @todo: need information, haven't seen any .ply files with this
+
+        }
 
     } // namespace nply
 } // namespace ncore
