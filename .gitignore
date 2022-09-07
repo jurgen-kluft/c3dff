@@ -16,13 +16,10 @@ tags
 !*.h
 !*.inl
 
-!*.build
-
+!*.sh
 !*.go
 
-!*.cs
-!*.csproj
-!*.resx
+!*.ply
 
 !*.hlsl
 !*.fragment
