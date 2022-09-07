@@ -6,7 +6,7 @@ namespace ncore
 {
     namespace nply
     {
-        enum PlyType
+        enum etype
         {
             TYPE_SIGNED    = 0x100,
             TYPE_UNSIGNED  = 0x200,
@@ -24,20 +24,25 @@ namespace ncore
             TYPE_SIZE_MASK = 0xFF,
         };
 
-        inline static s32  type_sizeof(PlyType type) { return (type & TYPE_SIZE_MASK); }
-        inline static bool type_islist(PlyType type) { return (type & TYPE_LIST) == TYPE_LIST; }
-        inline static bool type_is_int(PlyType type) { return (type & (TYPE_UNSIGNED | TYPE_SIGNED)) == (TYPE_UNSIGNED | TYPE_SIGNED); }
-        inline static bool type_is_f32(PlyType type) { return (type & TYPE_FLOAT32) == TYPE_FLOAT32; }
-        inline static bool type_is_f64(PlyType type) { return (type & TYPE_FLOAT64) == TYPE_FLOAT64; }
+        inline static s32  type_sizeof(etype type) { return (type & TYPE_SIZE_MASK); }
+        inline static bool type_islist(etype type) { return (type & TYPE_LIST) == TYPE_LIST; }
+        inline static bool type_is_int(etype type) { return (type & (TYPE_UNSIGNED | TYPE_SIGNED)) == (TYPE_UNSIGNED | TYPE_SIGNED); }
+        inline static bool type_is_f32(etype type) { return (type & TYPE_FLOAT32) == TYPE_FLOAT32; }
+        inline static bool type_is_f64(etype type) { return (type & TYPE_FLOAT64) == TYPE_FLOAT64; }
 
-        struct PlyString
+        struct string_t
         {
-            PlyString(const char* str, const char* end)
+            string_t()
+                : m_str(nullptr)
+                , m_end(nullptr)
+            {
+            }
+            string_t(const char* str, const char* end)
                 : m_str(str)
                 , m_end(end)
             {
             }
-            PlyString(const char* str, u32 len)
+            string_t(const char* str, u32 len)
                 : m_str(str)
                 , m_end(str + len)
             {
@@ -46,60 +51,62 @@ namespace ncore
             const char* m_end;
 
             inline bool is_empty() const { return m_str == m_end; }
-
-            inline static s32 compare(const PlyString& as, const char* b)
-            {
-                const char* a = as.m_str;
-                while (a < as.m_str && *b != 0)
-                {
-                    if (*a != *b)
-                    {
-                        if ((s32)(unsigned char)(*a) < (s32)(unsigned char)(*b))
-                            return -1;
-                        return 1;
-                    }
-                    ++a;
-                    ++b;
-                }
-                if (a == as.m_str && *b == 0)
-                    return 0;
-                if (a < as.m_str)
-                    return 1;
-                return -1;
-            }
-
-            static s32 compare(const PlyString& as, const PlyString& bs)
-            {
-                const char* a = as.m_str;
-                const char* b = bs.m_str;
-                while (a < as.m_end && b < bs.m_end)
-                {
-                    if (*a != *b)
-                    {
-                        if (*a < *b)
-                            return -1;
-                        return 1;
-                    }
-                    a++;
-                    b++;
-                }
-                if (a == as.m_end && b == bs.m_end)
-                    return 0;
-                if (a < as.m_end)
-                    return 1;
-                return -1;
-            }
+            inline u32  length() const { return (u32)(m_end - m_str); }
         };
 
-        static bool operator==(const PlyString& _this, const char* other) { return PlyString::compare(_this, other) == 0; }
-        static bool operator!=(const PlyString& _this, const char* other) { return PlyString::compare(_this, other) != 0; }
+        inline static s32 compare(const string_t& as, const char* b)
+        {
+            const char* a = as.m_str;
+            while (a < as.m_str && *b != 0)
+            {
+                if (*a != *b)
+                {
+                    if ((s32)(unsigned char)(*a) < (s32)(unsigned char)(*b))
+                        return -1;
+                    return 1;
+                }
+                ++a;
+                ++b;
+            }
+            if (a == as.m_str && *b == 0)
+                return 0;
+            if (a < as.m_str)
+                return 1;
+            return -1;
+        }
 
-        static bool operator==(const PlyString& _this, const PlyString& other) { return PlyString::compare(_this, other) == 0; }
-        static bool operator!=(const PlyString& _this, const PlyString& other) { return PlyString::compare(_this, other) != 0; }
+        static s32 compare(const string_t& as, const string_t& bs)
+        {
+            const char* a = as.m_str;
+            const char* b = bs.m_str;
+            while (a < as.m_end && b < bs.m_end)
+            {
+                if (*a != *b)
+                {
+                    if (*a < *b)
+                        return -1;
+                    return 1;
+                }
+                a++;
+                b++;
+            }
+            if (a == as.m_end && b == bs.m_end)
+                return 0;
+            if (a < as.m_end)
+                return 1;
+            return -1;
+        }
 
-        static PlyType parse_type(PlyString const& str)
+        static bool operator==(const string_t& _this, const char* other) { return compare(_this, other) == 0; }
+        static bool operator!=(const string_t& _this, const char* other) { return compare(_this, other) != 0; }
+
+        static bool operator==(const string_t& _this, const string_t& other) { return compare(_this, other) == 0; }
+        static bool operator!=(const string_t& _this, const string_t& other) { return compare(_this, other) != 0; }
+
+        static etype parse_type(string_t const& str)
         {
             // @note: Can be optimized a bit by branching on the first character, e.g. 'i', 'u', 'f'
+            //        as well as length of the string, e.g. 3(1), 4(3), 5(6), 6(4), 7(2)
             if (str == "int8" || str == "char")
                 return TYPE_INT8;
             else if (str == "uint8" || str == "uchar")
@@ -119,118 +126,88 @@ namespace ncore
             return TYPE_INVALID;
         }
 
-        template <typename T, typename T2> inline T2 endian_swap(const T& v) { return v; }
-        template <> inline u16                       endian_swap<u16, u16>(const u16& v) { return (v << 8) | (v >> 8); }
-        template <> inline u32                       endian_swap<u32, u32>(const u32& v) { return (v << 24) | ((v << 8) & 0x00ff0000) | ((v >> 8) & 0x0000ff00) | (v >> 24); }
-        template <> inline u64                       endian_swap<u64, u64>(const u64& v)
+        template <typename T> T* construct(allocator_t* alloc)
         {
-            return (((v & 0x00000000000000ffLL) << 56) | ((v & 0x000000000000ff00LL) << 40) | ((v & 0x0000000000ff0000LL) << 24) | ((v & 0x00000000ff000000LL) << 8) | ((v & 0x000000ff00000000LL) >> 8) | ((v & 0x0000ff0000000000LL) >> 24) |
-                    ((v & 0x00ff000000000000LL) >> 40) | ((v & 0xff00000000000000LL) >> 56));
-        }
-        template <> inline s16 endian_swap<s16, s16>(const s16& v)
-        {
-            u16 r = endian_swap<u16, u16>(*(u16*)&v);
-            return *(s16*)&r;
-        }
-        template <> inline s32 endian_swap<s32, s32>(const s32& v)
-        {
-            u32 r = endian_swap<u32, u32>(*(u32*)&v);
-            return *(s32*)&r;
-        }
-        template <> inline s64 endian_swap<s64, s64>(const s64& v)
-        {
-            u64 r = endian_swap<u64, u64>(*(u64*)&v);
-            return *(s64*)&r;
-        }
-        template <> inline f32 endian_swap<u32, f32>(const u32& v)
-        {
-            union
-            {
-                f32 f;
-                u32 i;
-            };
-            i = endian_swap<u32, u32>(v);
-            return f;
-        }
-        template <> inline f64 endian_swap<u64, f64>(const u64& v)
-        {
-            union
-            {
-                f64 d;
-                u64 i;
-            };
-            i = endian_swap<u64, u64>(v);
-            return d;
+            void* ptr = alloc->alloc(sizeof(T));
+            return (T*)ptr;
         }
 
-        class PlyAllocator
+        struct property_t
         {
-        public:
-            template <typename T> T* construct()
-            {
-                void* ptr = v_allocate(sizeof(T));
-                return (T*)ptr;
-            }
-            void* alloc(u32 size) { return v_allocate(size); }
-
-        protected:
-            virtual void* v_allocate(u32 size) { return nullptr; }
+            string_t m_name;
+            etype    m_property_type;
+            etype    m_list_count_type;
+            etype    m_binary_type;   // how we are storing it
+            s32      m_binary_offset; // in an element, what is the offset to write it at
         };
 
-        struct PlyProperty
+        struct buffer_t
         {
-            PlyString m_name;
-            PlyType   m_property_type{TYPE_INVALID};
-            PlyType   m_list_count_type{TYPE_INVALID};
-        };
-
-        struct PlyBuffer
-        {
-            u32 m_size;
+            u32 m_size; // size in bytes
             u8* m_buffer;
         };
 
-        struct PlyElement
+        struct element_t
         {
-            PlyString    m_name;
-            u32          m_prop_count;
-            PlyProperty* m_prop_array;
-            PlyBuffer*   m_data;
-            PlyElement*  m_next;
+            string_t    m_name;
+            u32         m_binary_size; // size in bytes of one element
+            u32         m_prop_count;
+            property_t* m_prop_array;
+            buffer_t*   m_data;
+            element_t*  m_next;
         };
 
-        struct PlyComment
+        struct objinfo_t
         {
-            PlyString   m_comment;
-            PlyComment* m_next;
+            string_t   m_comment;
+            objinfo_t* m_next;
         };
 
-        enum PlyFormat
+        struct comment_t
+        {
+            string_t   m_comment;
+            comment_t* m_next;
+        };
+
+        enum eformat
         {
             FORMAT_ASCII = 0, // ASCII
             FORMAT_BLE,       // Binary Little Endian
             FORMAT_BBE,       // Binary Big Endian
         };
 
-        struct PlyHeader
+        struct header_t
         {
-            PlyFormat   m_format;
-            PlyString   m_version;
-            u32         m_num_elements;
-            u32         m_num_comments;
-            PlyComment* m_comments;
-            PlyElement* m_elements;
+            eformat    m_format;
+            string_t   m_version;
+            u32        m_num_elements;
+            u32        m_num_comments;
+            comment_t* m_comments;
+            objinfo_t* m_obj_info;
+            element_t* m_elements;
         };
 
-        struct PlyCtxt
+        struct ply_t
         {
-            PlyAllocator* m_alloc;
-            PlyHeader*    m_hdr;
-            PlyComment*   m_comments;
-            PlyElement*   m_elements;
+            allocator_t*  m_alloc;
+            linereader_t* m_line_reader;
+            header_t*     m_hdr;
+            comment_t*    m_comments;
+            objinfo_t*    m_obj_info;
+            element_t*    m_elements;
         };
 
-        static void add_comment(PlyCtxt* ctxt, PlyComment* comment)
+        ply_t* create(allocator_t* allocator, linereader_t* line_reader)
+        {
+            ply_t* ply         = construct<ply_t>(allocator);
+            ply->m_alloc       = allocator;
+            ply->m_line_reader = line_reader;
+            ply->m_hdr         = nullptr;
+            ply->m_comments    = nullptr;
+            ply->m_elements    = nullptr;
+        }
+
+        static void add_comment(ply_t* ctxt, comment_t* comment)
         {
             comment->m_next = nullptr;
             if (ctxt->m_hdr->m_comments == nullptr)
@@ -241,25 +218,10 @@ namespace ncore
             {
                 ctxt->m_comments->m_next = comment;
             }
-
             ctxt->m_comments = comment;
         }
 
-        static PlyString read_line(const char*& str, const char* str_end)
-        {
-            const char* line = str;
-            while (str < str_end)
-            {
-                if (str[0] == '\n')
-                {
-                    return PlyString(line, str);
-                }
-                str++;
-            }
-            return PlyString(str_end, str_end);
-        }
-
-        static void skip_whitespace(PlyString& line)
+        static void skip_whitespace(string_t& line)
         {
             while (line.m_str < line.m_end)
             {
@@ -269,7 +231,7 @@ namespace ncore
             }
         }
 
-        static PlyString read_token(PlyString& line)
+        static string_t read_token(string_t& line)
         {
             skip_whitespace(line);
             const char* token = line.m_str;
@@ -279,10 +241,10 @@ namespace ncore
                     break;
                 line.m_str++;
             }
-            return PlyString(token, line.m_str);
+            return string_t(token, line.m_str);
         }
 
-        static u32 parse_u32(PlyString const& token)
+        static u32 parse_u32(string_t const& token)
         {
             u32         v   = 0;
             const char* str = token.m_str;
@@ -296,23 +258,91 @@ namespace ncore
             return v;
         }
 
-        static void        read_header_comment(PlyCtxt* ctxt, PlyString& line);
-        static void        read_header_format(PlyCtxt* ctxt, PlyString& line);
-        static PlyElement* read_header_element(PlyCtxt* ctxt, PlyString& line);
-        static void        read_header_property(PlyCtxt* ctxt, PlyElement* elem, PlyString& line);
-        static void        read_header_obj_info(PlyCtxt* ctxt, PlyString& line);
-
-        static bool parse_header(PlyCtxt* ctxt, const char* hdr_begin, const char* hdr_end)
+        string_t make_string(ply_t* ctxt, string_t const& str)
         {
-            ctxt->m_hdr = ctxt->m_alloc->construct<PlyHeader>();
+            s32 const   str_len    = ((str.length() + 1) + (4 - 1)) & ~(4 - 1);
+            char*       dst_str    = (char*)ctxt->m_alloc->alloc(str_len);
+            const char* dst_end    = dst_str + str_len;
+            char*       dst_cursor = dst_str;
+            const char* src_str    = str.m_str;
+            while (src_str < str.m_end)
+                *dst_cursor++ = *src_str++;
+            *dst_cursor = 0;
+            return string_t(dst_str, dst_cursor);
+        }
 
-            PlyString   line       = read_line(hdr_begin, hdr_end);
-            PlyElement* element    = nullptr;
-            s32         prop_index = 0;
-            bool        success    = true;
+        void read_header_comment(ply_t* ctxt, string_t& line)
+        {
+            comment_t* comment = construct<comment_t>(ctxt->m_alloc);
+            comment->m_comment = make_string(ctxt, line);
+            add_comment(ctxt, comment);
+        }
+
+        void read_header_format(ply_t* ctxt, string_t& line)
+        {
+            string_t token = read_token(line);
+            if (token == "ascii")
+                ctxt->m_hdr->m_format = FORMAT_ASCII;
+            else if (token == "binary_little_endian")
+                ctxt->m_hdr->m_format = FORMAT_BLE;
+            else if (token == "binary_big_endian")
+                ctxt->m_hdr->m_format = FORMAT_BBE;
+            string_t version_str   = read_token(line);
+            ctxt->m_hdr->m_version = make_string(ctxt, version_str);
+        }
+
+        element_t* read_header_element(ply_t* ctxt, string_t& line)
+        {
+            element_t* elem     = construct<element_t>(ctxt->m_alloc);
+            string_t   name_str = read_token(line);
+            elem->m_name        = make_string(ctxt, name_str);
+            string_t str_count  = read_token(line);
+            elem->m_prop_count  = parse_u32(str_count);
+            elem->m_prop_array  = (property_t*)ctxt->m_alloc->alloc(sizeof(property_t) * elem->m_prop_count);
+            return elem;
+        }
+
+        void read_header_property(ply_t* ctxt, element_t* elem, s32 prop_index, string_t& line)
+        {
+            ASSERT(elem->m_prop_array != nullptr);
+            property_t* prop       = &elem->m_prop_array[prop_index];
+            string_t    type_token = read_token(line);
+            if (type_token == "list")
+            {
+                string_t count_type_token = read_token(line);
+                string_t list_type_token  = read_token(line);
+                string_t property_name    = read_token(line);
+                prop->m_list_count_type   = parse_type(count_type_token);
+                prop->m_property_type     = (etype)(parse_type(list_type_token) | TYPE_LIST);
+                prop->m_name              = make_string(ctxt, property_name);
+            }
+            else
+            {
+                string_t property_type_token = read_token(line);
+                string_t property_name       = read_token(line);
+                prop->m_property_type        = parse_type(property_type_token);
+                prop->m_name                 = make_string(ctxt, property_name);
+            }
+        }
+
+        void read_header_obj_info(ply_t* ctxt, string_t& line)
+        {
+            // @todo: need information, haven't seen any .ply files with this
+        }
+
+        static bool read_header(ply_t* ctxt)
+        {
+            ctxt->m_hdr = construct<header_t>(ctxt->m_alloc);
+
+            string_t line;
+            ctxt->m_line_reader->read_line(line.m_str, line.m_end);
+
+            element_t* element    = nullptr;
+            s32        prop_index = 0;
+            bool       success    = true;
             while (line.m_str != line.m_end)
             {
-                PlyString token = read_token(line);
+                string_t token = read_token(line);
                 if (token == "comment")
                 {
                     read_header_comment(ctxt, line);
@@ -328,7 +358,8 @@ namespace ncore
                 }
                 else if (token == "property")
                 {
-                    read_header_property(ctxt, element, line);
+                    read_header_property(ctxt, element, prop_index, line);
+                    prop_index += 1;
                 }
                 else if (token == "obj_info")
                 {
@@ -345,103 +376,20 @@ namespace ncore
                     success = false;
                 }
 
-                line = read_line(hdr_begin, hdr_end);
+                if (!ctxt->m_line_reader->read_line(line.m_str, line.m_end))
+                    break;
             }
             return success;
         }
 
-        void read_header_comment(PlyCtxt* ctxt, PlyString& line)
-        {
-            PlyComment* comment = ctxt->m_alloc->construct<PlyComment>();
-            comment->m_comment  = line;
-            add_comment(ctxt, comment);
-        }
-
-        void read_header_format(PlyCtxt* ctxt, PlyString& line)
-        {
-            PlyString token = read_token(line);
-            if (token == "ascii")
-                ctxt->m_hdr->m_format = FORMAT_ASCII;
-            else if (token == "binary_little_endian")
-                ctxt->m_hdr->m_format = FORMAT_BLE;
-            else if (token == "binary_big_endian")
-                ctxt->m_hdr->m_format = FORMAT_BBE;
-            ctxt->m_hdr->m_version = read_token(line);
-        }
-
-        PlyElement* read_header_element(PlyCtxt* ctxt, PlyString& line)
-        {
-            PlyElement* elem    = ctxt->m_alloc->construct<PlyElement>();
-            elem->m_name        = read_token(line);
-            PlyString str_count = read_token(line);
-            elem->m_prop_count  = parse_u32(str_count);
-            elem->m_prop_array = (PlyProperty*)ctxt->m_alloc->alloc(sizeof(PlyProperty) * elem->m_prop_count);
-            return elem;
-        }
-
-        void read_header_property(PlyCtxt* ctxt, PlyElement* elem, s32 prop_index, PlyString& line)
-        {
-            ASSERT(elem->m_prop_array != nullptr);
-            PlyProperty* prop       = &elem->m_prop_array[prop_index];
-            PlyString    type_token = read_token(line);
-            if (type_token == "list")
-            {
-                PlyString count_type_token = read_token(line);
-                PlyString list_type_token  = read_token(line);
-                PlyString property_name    = read_token(line);
-                prop->m_list_count_type    = parse_type(count_type_token);
-                prop->m_property_type      = parse_type(list_type_token) | TYPE_LIST;
-                prop->m_name               = property_name;
-            }
-            else
-            {
-                PlyString property_type_token = read_token(line);
-                PlyString property_name       = read_token(line);
-                prop->m_property_type         = parse_type(property_type_token);
-                prop->m_name                  = property_name;
-            }
-        }
-
-        void read_header_obj_info(PlyCtxt* ctxt, PlyString& line)
-        {
-            // @todo: need information, haven't seen any .ply files with this
-
-        }
-
-
-        void read_element_data(PlyCtxt* ctxt, PlyElement* elem, PlyString& line)
+        void read_element_data(ply_t* ctxt, element_t* elem, string_t& line)
         {
             // @todo: how are we going to read element data and where to store?
             // - first compute the binary size of an element (float[3]/uchar[4])
             // - allocate the buffer, count * binary size of one element
-
-            // @todo: when the user just asks for the vertices, we could return
-            //        PlyArray with the stride size of one element and the property information.
-            // Or
-
-            struct user_vertex_t
-            {
-                float x,y,z;
-                u8 color[3]; // only r, g, b
-            };
-
-            // element name, property name, destination type, binary offset
-            // the user can now also mark some properties to skip!
-            set_offset("vertex", "x", TYPE_FLOAT32, 0);
-            set_offset("vertex", "y", TYPE_FLOAT32, 4);
-            set_offset("vertex", "z", TYPE_FLOAT32, 8);
-            set_offset("vertex", "r", TYPE_UINT8, 12, 0xFF); // default = 0xFF
-            set_offset("vertex", "g", TYPE_UINT8, 13, 0xFF);
-            set_offset("vertex", "b", TYPE_UINT8, 14, 0xFF);
-            set_offset("vertex", "a", TYPE_INVALID, -1, 0xFF); // discard 'a'
-
-            // read ply file with the above knowledge
-            // read_ply( ... )
-
-            // then now the user can ask the element buffer attached to the 'vertices' element
-            ply_array_t<user_vertex_t> vertices = get_array<user_vertex_t>("vertices");
-            
         }
+
+        void read(ply_t* ply) { read_header(ply); }
 
     } // namespace nply
 } // namespace ncore
