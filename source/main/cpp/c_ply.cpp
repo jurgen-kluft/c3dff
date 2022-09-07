@@ -371,7 +371,24 @@ namespace ncore
             // - allocate the buffer, count * binary size of one element
         }
 
-        void read(ply_t* ply) { read_header(ply); }
+        void read_elements(ply_t* ctxt)
+        {
+            element_t* elem = ply->m_hdr->m_elements;
+            while (elem != nullptr)
+            {
+                string_t line;
+                if (!ctxt->m_line_reader->read_line(line.m_str, line.m_end))
+                    break;
+                read_element_data(ctxt, elem, line);
+                elem = elem->m_next;
+            }
+        }
+
+        void read(ply_t* ply) 
+        { 
+            read_header(ply); 
+            read_elements(ply);
+        }
 
     } // namespace nply
 } // namespace ncore
