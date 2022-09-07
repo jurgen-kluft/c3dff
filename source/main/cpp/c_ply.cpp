@@ -184,11 +184,18 @@ namespace ncore
             PlyType   m_list_count_type{TYPE_INVALID};
         };
 
+        struct PlyBuffer
+        {
+            u32 m_size;
+            u8* m_buffer;
+        };
+
         struct PlyElement
         {
             PlyString    m_name;
             u32          m_prop_count;
             PlyProperty* m_prop_array;
+            PlyBuffer*   m_data;
             PlyElement*  m_next;
         };
 
@@ -399,6 +406,41 @@ namespace ncore
         {
             // @todo: need information, haven't seen any .ply files with this
 
+        }
+
+
+        void read_element_data(PlyCtxt* ctxt, PlyElement* elem, PlyString& line)
+        {
+            // @todo: how are we going to read element data and where to store?
+            // - first compute the binary size of an element (float[3]/uchar[4])
+            // - allocate the buffer, count * binary size of one element
+
+            // @todo: when the user just asks for the vertices, we could return
+            //        PlyArray with the stride size of one element and the property information.
+            // Or
+
+            struct user_vertex_t
+            {
+                float x,y,z;
+                u8 color[3]; // only r, g, b
+            };
+
+            // element name, property name, destination type, binary offset
+            // the user can now also mark some properties to skip!
+            set_offset("vertex", "x", TYPE_FLOAT32, 0);
+            set_offset("vertex", "y", TYPE_FLOAT32, 4);
+            set_offset("vertex", "z", TYPE_FLOAT32, 8);
+            set_offset("vertex", "r", TYPE_UINT8, 12, 0xFF); // default = 0xFF
+            set_offset("vertex", "g", TYPE_UINT8, 13, 0xFF);
+            set_offset("vertex", "b", TYPE_UINT8, 14, 0xFF);
+            set_offset("vertex", "a", TYPE_INVALID, -1, 0xFF); // discard 'a'
+
+            // read ply file with the above knowledge
+            // read_ply( ... )
+
+            // then now the user can ask the element buffer attached to the 'vertices' element
+            ply_array_t<user_vertex_t> vertices = get_array<user_vertex_t>("vertices");
+            
         }
 
     } // namespace nply
