@@ -6,24 +6,6 @@ namespace ncore
 {
     namespace nply
     {
-        enum etype
-        {
-            TYPE_SIGNED    = 0x100,
-            TYPE_UNSIGNED  = 0x200,
-            TYPE_FLOAT     = 0x400,
-            TYPE_LIST      = 0x800,
-            TYPE_INVALID   = 0,
-            TYPE_INT8      = 0x1 | TYPE_SIGNED,
-            TYPE_UINT8     = 0x1 | TYPE_UNSIGNED,
-            TYPE_INT16     = 0x2 | TYPE_SIGNED,
-            TYPE_UINT16    = 0x2 | TYPE_UNSIGNED,
-            TYPE_INT32     = 0x4 | TYPE_SIGNED,
-            TYPE_UINT32    = 0x4 | TYPE_UNSIGNED,
-            TYPE_FLOAT32   = 0x4 | TYPE_FLOAT,
-            TYPE_FLOAT64   = 0x8 | TYPE_FLOAT,
-            TYPE_SIZE_MASK = 0xFF,
-        };
-
         inline static s32  type_sizeof(etype type) { return (type & TYPE_SIZE_MASK); }
         inline static bool type_islist(etype type) { return (type & TYPE_LIST) == TYPE_LIST; }
         inline static bool type_is_int(etype type) { return (type & (TYPE_UNSIGNED | TYPE_SIGNED)) == (TYPE_UNSIGNED | TYPE_SIGNED); }
