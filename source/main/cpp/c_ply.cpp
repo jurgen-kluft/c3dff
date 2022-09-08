@@ -547,11 +547,12 @@ namespace ncore
         template <typename T> u8* write_data(T v, etype dst_type, u8* dst) { return dst; }
 
         // clang-format off
+        // TODO: endian format
         template<>
         u8* write_data<f32>(f32 v, etype dst_type, u8* dst) {
             switch (dst_type) {
             case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
             case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
             case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
             case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
@@ -565,7 +566,7 @@ namespace ncore
         u8* write_data<f64>(f64 v, etype dst_type, u8* dst) {
             switch (dst_type) {
             case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
             case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
             case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
             case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
@@ -579,7 +580,7 @@ namespace ncore
         u8* write_data<s64>(s64 v, etype dst_type, u8* dst) {
             switch (dst_type) {
             case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
             case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
             case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
             case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
@@ -593,7 +594,7 @@ namespace ncore
         u8* write_data<u64>(u64 v, etype dst_type, u8* dst) {
             switch (dst_type) {
             case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
             case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
             case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
             case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
@@ -678,7 +679,7 @@ namespace ncore
             }
             else
             {
-                // @todo: binary data
+                // TODO: read binary format
             }
         }
 
