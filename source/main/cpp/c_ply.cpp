@@ -308,7 +308,7 @@ namespace ncore
             return elem;
         }
 
-        property_t* read_header_property(ply_t* ply, element_t* elem, s32 prop_index, string_t& line)
+        property_t* read_header_property(ply_t* ply, element_t* elem, string_t& line)
         {
             property_t* prop       = construct<property_t>(ply->m_alloc);
             string_t    type_token = read_token(line);
@@ -343,73 +343,68 @@ namespace ncore
         {
             ply->m_hdr = construct<header_t>(ply->m_alloc);
 
-            string_t   line;
             element_t* element = nullptr;
-            bool       success = true;
-            while (true)
+
+            string_t line;
+            while (ply->m_line_reader->read_line(line.m_str, line.m_end))
             {
                 string_t token = read_token(line);
-                if (token == "comment")
-                {
-                    read_header_comment(ply, line);
-                }
-                else if (token == "format")
-                {
-                    read_header_format(ply, line);
-                }
-                else if (token == "element")
-                {
-                    element = read_header_element(ply, line);
-                }
-                else if (token == "property")
-                {
-                    property_t* properties[32]; // need to make this dynamic?
-                    s32         prop_index = 0;
-                    while (true)
-                    {
-                        if (token == "property")
-                        {
-                            properties[prop_index] = read_header_property(ply, element, prop_index, line);
-                            prop_index += 1;
-                        }
-                        else if (!token.is_empty())
-                        {
-                            break;
-                        }
 
-                        if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
-                            break;
-                        token = read_token(line);
-                    }
-
-                    element->m_prop_count = prop_index;
-                    element->m_prop_array = (property_t**)ply->m_alloc->alloc(sizeof(property_t*) * prop_index);
-                    for (s32 i = 0; i < prop_index; i++)
-                    {
-                        element->m_prop_array[i] = properties[i];
-                    }
-
+                if (token == "ply" || token.is_empty())
+                {
                     continue;
                 }
-                else if (token == "obj_info")
+
+                while (true)
                 {
-                    read_header_obj_info(ply, line);
-                }
-                else
-                {
-                    if (token == "ply" || token.is_empty())
+                    if (token == "comment")
+                    {
+                        read_header_comment(ply, line);
+                    }
+                    else if (token == "format")
+                    {
+                        read_header_format(ply, line);
+                    }
+                    else if (token == "element")
+                    {
+                        element = read_header_element(ply, line);
+                    }
+                    else if (token == "property")
+                    {
+                        // TODO: need to make this dynamic?
+                        property_t* properties[32];
+                        s32         prop_count = 0;
+                        do
+                        {
+                            properties[prop_count++] = read_header_property(ply, element, line);
+                            do
+                            {
+                                if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
+                                    return false;
+                                token = read_token(line);
+                            } while (token.is_empty());
+                        } while (token == "property");
+
+                        element->m_prop_count = prop_count;
+                        element->m_prop_array = (property_t**)ply->m_alloc->alloc(sizeof(property_t*) * prop_count);
+                        for (s32 i = 0; i < prop_count; i++)
+                        {
+                            element->m_prop_array[i] = properties[i];
+                        }
                         continue;
-
-                    if (token == "end_header")
-                        break;
-
-                    success = false;
-                }
-
-                if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
+                    }
+                    else if (token == "obj_info")
+                    {
+                        read_header_obj_info(ply, line);
+                    }
+                    else
+                    {
+                        return (token == "end_header");
+                    }
                     break;
+                }
             }
-            return success;
+            return false;
         }
 
         bool set_ignore_property(ply_t* ply, const char* element_name, const char* property_name)
@@ -535,21 +530,20 @@ namespace ncore
             return fint + fdec;
         }
 
-        static inline u8* write_s8(u8* dst, s8 v) { return dst; }
-        static inline u8* write_u8(u8* dst, u8 v) { return dst; }
-        static inline u8* write_s16(u8* dst, s16 v) { return dst; }
-        static inline u8* write_u16(u8* dst, s16 v) { return dst; }
-        static inline u8* write_s32(u8* dst, s16 v) { return dst; }
-        static inline u8* write_u32(u8* dst, s16 v) { return dst; }
-        static inline u8* write_f32(u8* dst, s16 v) { return dst; }
-        static inline u8* write_f64(u8* dst, s16 v) { return dst; }
-
-        template <typename T> u8* write_data(T v, etype dst_type, u8* dst) { return dst; }
-
         // clang-format off
+        static inline u8* write_bytes(u8* dst, u8* src, s32 size) { while (size > 0) { *dst++ = v; --size; } return dst; }
+        static inline u8* write_u8(u8* dst, u8 v) { write_bytes(dst, (u8*)&v, 1); }
+        static inline u8* write_s8(u8* dst, s8 v) { write_bytes(dst, (u8*)&v, 1); }
+        static inline u8* write_u16(u8* dst, u16 v) { write_bytes(dst, (u8*)&v, 2); }
+        static inline u8* write_s16(u8* dst, s16 v) { write_bytes(dst, (u8*)&v, 2); }
+        static inline u8* write_u32(u8* dst, u32 v) { write_bytes(dst, (u8*)&v, 4); }
+        static inline u8* write_s32(u8* dst, s32 v) { write_bytes(dst, (u8*)&v, 4); }
+        static inline u8* write_f32(u8* dst, f32 v) { write_bytes(dst, (u8*)&v, 4); }
+        static inline u8* write_f64(u8* dst, f64 v) { write_bytes(dst, (u8*)&v, 8); }
+
         // TODO: endian format
-        template<>
-        u8* write_data<f32>(f32 v, etype dst_type, u8* dst) {
+
+        template <typename T> u8* write_data(T v, etype dst_type, u8* dst) { 
             switch (dst_type) {
             case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
             case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
@@ -562,55 +556,11 @@ namespace ncore
             }
             return dst;
         }
-        template<>
-        u8* write_data<f64>(f64 v, etype dst_type, u8* dst) {
-            switch (dst_type) {
-            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
-            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
-            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
-            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
-            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
-            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
-            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
-            }
-            return dst;
-        }
-        template<>
-        u8* write_data<s64>(s64 v, etype dst_type, u8* dst) {
-            switch (dst_type) {
-            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
-            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
-            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
-            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
-            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
-            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
-            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
-            }
-            return dst;
-        }
-        template<>
-        u8* write_data<u64>(u64 v, etype dst_type, u8* dst) {
-            switch (dst_type) {
-            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
-            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
-            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
-            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
-            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
-            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
-            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
-            }
-            return dst;
-        }
+
         // clang-format on
 
         bool read_element_asciidata(ply_t* ply, element_t* elem)
         {
-            // @todo: how are we going to read element data and where to store?
-            // - first compute the binary size of an element (float[3]/uchar[4])
-            // - allocate the buffer, count * binary size of one element
             elem->m_binary_size = 0;
             for (s32 i = 0; i < elem->m_prop_count; i++)
             {
@@ -634,8 +584,8 @@ namespace ncore
                 {
                     property_t* prop = elem->m_prop_array[i];
 
-                    // parse the value for this property
                     string_t value_str = read_token(line);
+                    
                     if (prop->m_property_type == TYPE_FLOAT32)
                     {
                         f32 f = parse_float32(value_str);
