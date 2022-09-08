@@ -7,11 +7,21 @@ namespace ncore
     namespace nply
     {
         inline static s32  type_sizeof(etype type) { return (type & TYPE_SIZE_MASK); }
-        inline static bool type_islist(etype type) { return (type & TYPE_LIST) == TYPE_LIST; }
+        inline static s32  type_index(etype type) { return (type & TYPE_INDEX_MASK) >> TYPE_INDEX_SHIFT; }
+        inline static bool type_is_list(etype type) { return (type & TYPE_LIST) == TYPE_LIST; }
         inline static bool type_is_int(etype type) { return (type & TYPE_SIGNED) == TYPE_SIGNED; }
+        inline static bool type_is_int8(etype type) { return type_is_int(type) && (type_sizeof(type) == 1); }
+        inline static bool type_is_int16(etype type) { return type_is_int(type) && (type_sizeof(type) == 2); }
+        inline static bool type_is_int32(etype type) { return type_is_int(type) && (type_sizeof(type) == 4); }
+        inline static bool type_is_int64(etype type) { return type_is_int(type) && (type_sizeof(type) == 8); }
         inline static bool type_is_uint(etype type) { return (type & TYPE_UNSIGNED) == TYPE_UNSIGNED; }
+        inline static bool type_is_uint8(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
+        inline static bool type_is_uint16(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
+        inline static bool type_is_uint32(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
+        inline static bool type_is_uint64(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
         inline static bool type_is_f32(etype type) { return (type & TYPE_FLOAT32) == TYPE_FLOAT32; }
         inline static bool type_is_f64(etype type) { return (type & TYPE_FLOAT64) == TYPE_FLOAT64; }
+        inline static bool type_is_float(etype type) { return type_is_f32(type) | type_is_f64(type); }
 
         struct string_t
         {
@@ -148,7 +158,7 @@ namespace ncore
             u32          m_binary_size; // size in bytes of one element
             u32          m_prop_count;
             property_t** m_prop_array;
-            buffer_t*    m_data;
+            buffer_t     m_data;
             element_t*   m_next;
         };
 
@@ -525,7 +535,77 @@ namespace ncore
             return fint + fdec;
         }
 
-        bool read_element_data(ply_t* ply, element_t* elem)
+        static inline u8* write_s8(u8* dst, s8 v) { return dst; }
+        static inline u8* write_u8(u8* dst, u8 v) { return dst; }
+        static inline u8* write_s16(u8* dst, s16 v) { return dst; }
+        static inline u8* write_u16(u8* dst, s16 v) { return dst; }
+        static inline u8* write_s32(u8* dst, s16 v) { return dst; }
+        static inline u8* write_u32(u8* dst, s16 v) { return dst; }
+        static inline u8* write_f32(u8* dst, s16 v) { return dst; }
+        static inline u8* write_f64(u8* dst, s16 v) { return dst; }
+
+        template <typename T> u8* write_data(T v, etype dst_type, u8* dst) { return dst; }
+
+        // clang-format off
+        template<>
+        u8* write_data<f32>(f32 v, etype dst_type, u8* dst) {
+            switch (dst_type) {
+            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
+            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
+            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
+            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
+            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
+            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
+            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
+            }
+            return dst;
+        }
+        template<>
+        u8* write_data<f64>(f64 v, etype dst_type, u8* dst) {
+            switch (dst_type) {
+            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
+            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
+            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
+            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
+            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
+            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
+            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
+            }
+            return dst;
+        }
+        template<>
+        u8* write_data<s64>(s64 v, etype dst_type, u8* dst) {
+            switch (dst_type) {
+            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
+            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
+            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
+            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
+            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
+            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
+            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
+            }
+            return dst;
+        }
+        template<>
+        u8* write_data<u64>(u64 v, etype dst_type, u8* dst) {
+            switch (dst_type) {
+            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
+            case TYPE_UINT8   : { s8 i=(s8)v;   return write_u8(dst, i); }
+            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
+            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
+            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
+            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
+            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
+            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
+            }
+            return dst;
+        }
+        // clang-format on
+
+        bool read_element_asciidata(ply_t* ply, element_t* elem)
         {
             // @todo: how are we going to read element data and where to store?
             // - first compute the binary size of an element (float[3]/uchar[4])
@@ -537,8 +617,9 @@ namespace ncore
                 elem->m_binary_size += prop->m_list_count_type * (prop->m_binary_type & TYPE_SIZE_MASK);
             }
 
-            elem->m_data->m_buffer = (u8*)ply->m_alloc->alloc(elem->m_binary_size * elem->m_count);
+            elem->m_data.m_buffer = (u8*)ply->m_alloc->alloc(elem->m_binary_size * elem->m_count);
 
+            u8* dst = elem->m_data.m_buffer;
             for (s64 i = 0; i < elem->m_count; i++)
             {
                 string_t line;
@@ -557,41 +638,48 @@ namespace ncore
                     if (prop->m_property_type == TYPE_FLOAT32)
                     {
                         f32 f = parse_float32(value_str);
-
-                        // what is the binary destination format
-                        
+                        write_data<f32>(f, prop->m_binary_type, dst);
                     }
                     else if (prop->m_property_type == TYPE_FLOAT64)
                     {
                         f64 f = parse_float64(value_str);
+                        write_data<f64>(f, prop->m_binary_type, dst);
                     }
                     else if (type_is_int(prop->m_property_type))
                     {
                         s64 i = parse_int(value_str);
+                        write_data<s64>(i, prop->m_binary_type, dst);
                     }
                     else if (type_is_uint(prop->m_property_type))
                     {
                         u64 i = parse_uint(value_str);
+                        write_data<u64>(i, prop->m_binary_type, dst);
                     }
                 }
             }
             return true;
         }
 
-        void read_elements(ply_t* ply)
+        void read_elements_ascii(ply_t* ply)
         {
             element_t* elem = ply->m_hdr->m_elements;
             while (elem != nullptr)
             {
-                read_element_data(ply, elem);
+                read_element_asciidata(ply, elem);
                 elem = elem->m_next;
             }
         }
 
-        void read(ply_t* ply)
+        void read_data(ply_t* ply)
         {
-            read_header(ply);
-            read_elements(ply);
+            if (ply->m_hdr->m_format == FORMAT_ASCII)
+            {
+                read_elements_ascii(ply);
+            }
+            else
+            {
+                // @todo: binary data
+            }
         }
 
     } // namespace nply

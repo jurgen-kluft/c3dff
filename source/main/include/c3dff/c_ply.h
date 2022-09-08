@@ -28,14 +28,16 @@ namespace ncore
             TYPE_FLOAT     = 0x400,
             TYPE_LIST      = 0x800,
             TYPE_INVALID   = 0,
-            TYPE_INT8      = 0x1 | TYPE_SIGNED,
-            TYPE_UINT8     = 0x1 | TYPE_UNSIGNED,
-            TYPE_INT16     = 0x2 | TYPE_SIGNED,
-            TYPE_UINT16    = 0x2 | TYPE_UNSIGNED,
-            TYPE_INT32     = 0x4 | TYPE_SIGNED,
-            TYPE_UINT32    = 0x4 | TYPE_UNSIGNED,
-            TYPE_FLOAT32   = 0x4 | TYPE_FLOAT,
-            TYPE_FLOAT64   = 0x8 | TYPE_FLOAT,
+            TYPE_INT8      = 0x00000 | 0x1 | TYPE_SIGNED,
+            TYPE_UINT8     = 0x10000 | 0x1 | TYPE_UNSIGNED,
+            TYPE_INT16     = 0x20000 | 0x2 | TYPE_SIGNED,
+            TYPE_UINT16    = 0x30000 | 0x2 | TYPE_UNSIGNED,
+            TYPE_INT32     = 0x40000 | 0x4 | TYPE_SIGNED,
+            TYPE_UINT32    = 0x50000 | 0x4 | TYPE_UNSIGNED,
+            TYPE_FLOAT32   = 0x60000 | 0x4 | TYPE_FLOAT,
+            TYPE_FLOAT64   = 0x70000 | 0x8 | TYPE_FLOAT,
+            TYPE_INDEX_MASK = 0xFF0000,
+            TYPE_INDEX_SHIFT = 16,
             TYPE_SIZE_MASK = 0xFF,
         };
 
@@ -46,7 +48,7 @@ namespace ncore
         bool set_ignore_property(ply_t* ply, const char* element_name, const char* property_name);
         bool set_read_property(ply_t* ply, const char* element_name, const char* property_name, etype destination_type, s32 offset);
 
-        void read(ply_t* ply);
+        void read_data(ply_t* ply);
 
         template <typename T> class array_t
         {
