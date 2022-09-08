@@ -8,7 +8,8 @@ namespace ncore
     {
         inline static s32  type_sizeof(etype type) { return (type & TYPE_SIZE_MASK); }
         inline static bool type_islist(etype type) { return (type & TYPE_LIST) == TYPE_LIST; }
-        inline static bool type_is_int(etype type) { return (type & (TYPE_UNSIGNED | TYPE_SIGNED)) == (TYPE_UNSIGNED | TYPE_SIGNED); }
+        inline static bool type_is_int(etype type) { return (type & TYPE_SIGNED) == TYPE_SIGNED; }
+        inline static bool type_is_uint(etype type) { return (type & TYPE_UNSIGNED) == TYPE_UNSIGNED; }
         inline static bool type_is_f32(etype type) { return (type & TYPE_FLOAT32) == TYPE_FLOAT32; }
         inline static bool type_is_f64(etype type) { return (type & TYPE_FLOAT64) == TYPE_FLOAT64; }
 
@@ -36,6 +37,13 @@ namespace ncore
             inline u32  length() const { return (u32)(m_end - m_str); }
         };
 
+        inline static char to_lower(char c)
+        {
+            if (c >= 'A' && c <= 'Z')
+                return (c - 'A') + 'a';
+            return c;
+        }
+
         inline static s32 compare(const string_t& as, const char* b)
         {
             const char* a = as.m_str;
@@ -43,7 +51,9 @@ namespace ncore
             {
                 if (*a != *b)
                 {
-                    if ((s32)(unsigned char)(*a) < (s32)(unsigned char)(*b))
+                    char const ca = to_lower(*a);
+                    char const cb = to_lower(*b);
+                    if ((s32)(unsigned char)(ca) < (s32)(unsigned char)(cb))
                         return -1;
                     return 1;
                 }
@@ -63,9 +73,11 @@ namespace ncore
             const char* b = bs.m_str;
             while (a < as.m_end && b < bs.m_end)
             {
-                if (*a != *b)
+                char const ca = to_lower(*a);
+                char const cb = to_lower(*b);
+                if (ca != cb)
                 {
-                    if (*a < *b)
+                    if (ca < cb)
                         return -1;
                     return 1;
                 }
@@ -131,12 +143,13 @@ namespace ncore
 
         struct element_t
         {
-            string_t    m_name;
-            u32         m_binary_size; // size in bytes of one element
-            u32         m_prop_count;
-            property_t* m_prop_array;
-            buffer_t*   m_data;
-            element_t*  m_next;
+            string_t     m_name;
+            u32          m_count;
+            u32          m_binary_size; // size in bytes of one element
+            u32          m_prop_count;
+            property_t** m_prop_array;
+            buffer_t*    m_data;
+            element_t*   m_next;
         };
 
         struct objinfo_t
@@ -189,18 +202,18 @@ namespace ncore
             ply->m_elements    = nullptr;
         }
 
-        static void add_comment(ply_t* ctxt, comment_t* comment)
+        static void add_comment(ply_t* ply, comment_t* comment)
         {
             comment->m_next = nullptr;
-            if (ctxt->m_hdr->m_comments == nullptr)
+            if (ply->m_hdr->m_comments == nullptr)
             {
-                ctxt->m_hdr->m_comments = comment;
+                ply->m_hdr->m_comments = comment;
             }
             else
             {
-                ctxt->m_comments->m_next = comment;
+                ply->m_comments->m_next = comment;
             }
-            ctxt->m_comments = comment;
+            ply->m_comments = comment;
         }
 
         static void skip_whitespace(string_t& line)
@@ -240,10 +253,10 @@ namespace ncore
             return v;
         }
 
-        string_t make_string(ply_t* ctxt, string_t const& str)
+        string_t make_string(ply_t* ply, string_t const& str)
         {
             s32 const   str_len    = ((str.length() + 1) + (4 - 1)) & ~(4 - 1);
-            char*       dst_str    = (char*)ctxt->m_alloc->alloc(str_len);
+            char*       dst_str    = (char*)ply->m_alloc->alloc(str_len);
             const char* dst_end    = dst_str + str_len;
             char*       dst_cursor = dst_str;
             const char* src_str    = str.m_str;
@@ -253,41 +266,41 @@ namespace ncore
             return string_t(dst_str, dst_cursor);
         }
 
-        void read_header_comment(ply_t* ctxt, string_t& line)
+        void read_header_comment(ply_t* ply, string_t& line)
         {
-            comment_t* comment = construct<comment_t>(ctxt->m_alloc);
-            comment->m_comment = make_string(ctxt, line);
-            add_comment(ctxt, comment);
+            comment_t* comment = construct<comment_t>(ply->m_alloc);
+            comment->m_comment = make_string(ply, line);
+            add_comment(ply, comment);
         }
 
-        void read_header_format(ply_t* ctxt, string_t& line)
+        void read_header_format(ply_t* ply, string_t& line)
         {
             string_t token = read_token(line);
             if (token == "ascii")
-                ctxt->m_hdr->m_format = FORMAT_ASCII;
+                ply->m_hdr->m_format = FORMAT_ASCII;
             else if (token == "binary_little_endian")
-                ctxt->m_hdr->m_format = FORMAT_BLE;
+                ply->m_hdr->m_format = FORMAT_BLE;
             else if (token == "binary_big_endian")
-                ctxt->m_hdr->m_format = FORMAT_BBE;
-            string_t version_str   = read_token(line);
-            ctxt->m_hdr->m_version = make_string(ctxt, version_str);
+                ply->m_hdr->m_format = FORMAT_BBE;
+            string_t version_str  = read_token(line);
+            ply->m_hdr->m_version = make_string(ply, version_str);
         }
 
-        element_t* read_header_element(ply_t* ctxt, string_t& line)
+        element_t* read_header_element(ply_t* ply, string_t& line)
         {
-            element_t* elem     = construct<element_t>(ctxt->m_alloc);
+            element_t* elem     = construct<element_t>(ply->m_alloc);
             string_t   name_str = read_token(line);
-            elem->m_name        = make_string(ctxt, name_str);
+            elem->m_name        = make_string(ply, name_str);
             string_t str_count  = read_token(line);
-            elem->m_prop_count  = parse_u32(str_count);
-            elem->m_prop_array  = (property_t*)ctxt->m_alloc->alloc(sizeof(property_t) * elem->m_prop_count);
+            elem->m_count       = parse_u32(str_count);
+            elem->m_prop_array  = nullptr;
+            elem->m_prop_count  = 0;
             return elem;
         }
 
-        void read_header_property(ply_t* ctxt, element_t* elem, s32 prop_index, string_t& line)
+        property_t* read_header_property(ply_t* ply, element_t* elem, s32 prop_index, string_t& line)
         {
-            ASSERT(elem->m_prop_array != nullptr);
-            property_t* prop       = &elem->m_prop_array[prop_index];
+            property_t* prop       = construct<property_t>(ply->m_alloc);
             string_t    type_token = read_token(line);
             if (type_token == "list")
             {
@@ -296,60 +309,85 @@ namespace ncore
                 string_t property_name    = read_token(line);
                 prop->m_list_count_type   = parse_type(count_type_token);
                 prop->m_property_type     = (etype)(parse_type(list_type_token) | TYPE_LIST);
-                prop->m_name              = make_string(ctxt, property_name);
+                prop->m_name              = make_string(ply, property_name);
             }
             else
             {
                 string_t property_type_token = read_token(line);
                 string_t property_name       = read_token(line);
+                prop->m_list_count_type      = TYPE_INVALID;
                 prop->m_property_type        = parse_type(property_type_token);
-                prop->m_name                 = make_string(ctxt, property_name);
+                prop->m_name                 = make_string(ply, property_name);
             }
+            prop->m_binary_type   = prop->m_property_type;
+            prop->m_binary_offset = 0;
+            return prop;
         }
 
-        void read_header_obj_info(ply_t* ctxt, string_t& line)
+        void read_header_obj_info(ply_t* ply, string_t& line)
         {
             // @todo: need information, haven't seen any .ply files with this
         }
 
-        static bool read_header(ply_t* ctxt)
+        bool read_header(ply_t* ply)
         {
-            ctxt->m_hdr = construct<header_t>(ctxt->m_alloc);
+            ply->m_hdr = construct<header_t>(ply->m_alloc);
 
-            string_t line;
-            ctxt->m_line_reader->read_line(line.m_str, line.m_end);
-
-            element_t* element    = nullptr;
-            s32        prop_index = 0;
-            bool       success    = true;
-            while (line.m_str != line.m_end)
+            string_t   line;
+            element_t* element = nullptr;
+            bool       success = true;
+            while (true)
             {
                 string_t token = read_token(line);
                 if (token == "comment")
                 {
-                    read_header_comment(ctxt, line);
+                    read_header_comment(ply, line);
                 }
                 else if (token == "format")
                 {
-                    read_header_format(ctxt, line);
+                    read_header_format(ply, line);
                 }
                 else if (token == "element")
                 {
-                    element    = read_header_element(ctxt, line);
-                    prop_index = 0;
+                    element = read_header_element(ply, line);
                 }
                 else if (token == "property")
                 {
-                    read_header_property(ctxt, element, prop_index, line);
-                    prop_index += 1;
+                    property_t* properties[32]; // need to make this dynamic?
+                    s32         prop_index = 0;
+                    while (true)
+                    {
+                        if (token == "property")
+                        {
+                            properties[prop_index] = read_header_property(ply, element, prop_index, line);
+                            prop_index += 1;
+                        }
+                        else if (!token.is_empty())
+                        {
+                            break;
+                        }
+
+                        if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
+                            break;
+                        token = read_token(line);
+                    }
+
+                    element->m_prop_count = prop_index;
+                    element->m_prop_array = (property_t**)ply->m_alloc->alloc(sizeof(property_t*) * prop_index);
+                    for (s32 i = 0; i < prop_index; i++)
+                    {
+                        element->m_prop_array[i] = properties[i];
+                    }
+
+                    continue;
                 }
                 else if (token == "obj_info")
                 {
-                    read_header_obj_info(ctxt, line);
+                    read_header_obj_info(ply, line);
                 }
                 else
                 {
-                    if (token == "ply" || token == "PLY" || token.is_empty())
+                    if (token == "ply" || token.is_empty())
                         continue;
 
                     if (token == "end_header")
@@ -358,35 +396,201 @@ namespace ncore
                     success = false;
                 }
 
-                if (!ctxt->m_line_reader->read_line(line.m_str, line.m_end))
+                if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
                     break;
             }
             return success;
         }
 
-        void read_element_data(ply_t* ctxt, element_t* elem, string_t& line)
-        {
-            // @todo: how are we going to read element data and where to store?
-            // - first compute the binary size of an element (float[3]/uchar[4])
-            // - allocate the buffer, count * binary size of one element
-        }
-
-        void read_elements(ply_t* ctxt)
+        bool set_ignore_property(ply_t* ply, const char* element_name, const char* property_name)
         {
             element_t* elem = ply->m_hdr->m_elements;
             while (elem != nullptr)
             {
-                string_t line;
-                if (!ctxt->m_line_reader->read_line(line.m_str, line.m_end))
+                if (elem->m_name == element_name)
+                {
+                    for (s32 i = 0; i < elem->m_prop_count; i++)
+                    {
+                        property_t* prop = elem->m_prop_array[i];
+                        if (prop->m_name == property_name)
+                        {
+                            prop->m_binary_offset = -1;
+                            prop->m_binary_type   = TYPE_INVALID;
+                            return true;
+                        }
+                    }
+                }
+                elem = elem->m_next;
+            }
+            return false;
+        }
+
+        bool set_read_property(ply_t* ply, const char* element_name, const char* property_name, etype destination_type, s32 offset)
+        {
+            element_t* elem = ply->m_hdr->m_elements;
+            while (elem != nullptr)
+            {
+                if (elem->m_name == element_name)
+                {
+                    for (s32 i = 0; i < elem->m_prop_count; i++)
+                    {
+                        property_t* prop = elem->m_prop_array[i];
+                        if (prop->m_name == property_name)
+                        {
+                            prop->m_binary_offset = offset;
+                            prop->m_binary_type   = destination_type;
+                            return true;
+                        }
+                    }
+                }
+                elem = elem->m_next;
+            }
+            return false;
+        }
+
+        static inline void trim_whitespace(const char*& str, const char*& end)
+        {
+            while (str < end && (str[0] == ' ' || str[0] == '\t'))
+                str++;
+            while (end > str && (end[-1] == ' ' || end[-1] == '\t'))
+                --end;
+        }
+
+        static u64 parse_uint(string_t const& _str)
+        {
+            const char* str = _str.m_str;
+            const char* end = _str.m_end;
+            trim_whitespace(str, end);
+            u64 v = 0;
+            while (str < end)
+            {
+                v = v * 10;
+                v = v + (*str - '0');
+                str++;
+            }
+            return v;
+        }
+
+        static s64 parse_int(string_t const& _str)
+        {
+            string_t   str    = _str;
+            const char prefix = *str.m_str;
+            if (prefix == '-' || prefix == '+')
+                str.m_str++;
+            s64 const v = (s64)parse_uint(str);
+            if (prefix == '-')
+                return -v;
+            return v;
+        }
+
+        static f32 parse_float32(string_t const& str)
+        {
+            string_t intpart(str.m_str, str.m_str);
+            string_t decpart(str.m_str, str.m_end);
+            trim_whitespace(intpart.m_str, decpart.m_end);
+            while (intpart.m_end < decpart.m_end)
+            {
+                if (*intpart.m_end == '.')
+                {
+                    decpart.m_str = intpart.m_end + 1;
                     break;
-                read_element_data(ctxt, elem, line);
+                }
+                intpart.m_end++;
+            }
+            u64 const intvalue = parse_int(intpart);
+            u64 const decvalue = parse_int(decpart);
+            f32 const fint     = (f32)intvalue;
+            f32 const fdec     = (f32)decvalue / (f32)(decpart.length() * 10);
+            return fint + fdec;
+        }
+
+        static f64 parse_float64(string_t const& str)
+        {
+            string_t intpart(str.m_str, str.m_str);
+            string_t decpart(str.m_str, str.m_end);
+            trim_whitespace(intpart.m_str, decpart.m_end);
+            while (intpart.m_end < decpart.m_end)
+            {
+                if (*intpart.m_end == '.')
+                {
+                    decpart.m_str = intpart.m_end + 1;
+                    break;
+                }
+                intpart.m_end++;
+            }
+            u64 const intvalue = parse_int(intpart);
+            u64 const decvalue = parse_int(decpart);
+            f64 const fint     = (f64)intvalue;
+            f64 const fdec     = (f64)decvalue / (f64)(decpart.length() * 10);
+            return fint + fdec;
+        }
+
+        bool read_element_data(ply_t* ply, element_t* elem)
+        {
+            // @todo: how are we going to read element data and where to store?
+            // - first compute the binary size of an element (float[3]/uchar[4])
+            // - allocate the buffer, count * binary size of one element
+            elem->m_binary_size = 0;
+            for (s32 i = 0; i < elem->m_prop_count; i++)
+            {
+                property_t* prop = elem->m_prop_array[i];
+                elem->m_binary_size += prop->m_list_count_type * (prop->m_binary_type & TYPE_SIZE_MASK);
+            }
+
+            elem->m_data->m_buffer = (u8*)ply->m_alloc->alloc(elem->m_binary_size * elem->m_count);
+
+            for (s64 i = 0; i < elem->m_count; i++)
+            {
+                string_t line;
+                do
+                {
+                    if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
+                        return false;
+                } while (line.is_empty());
+
+                for (s32 i = 0; i < elem->m_prop_count; ++i)
+                {
+                    property_t* prop = elem->m_prop_array[i];
+
+                    // parse the value for this property
+                    string_t value_str = read_token(line);
+                    if (prop->m_property_type == TYPE_FLOAT32)
+                    {
+                        f32 f = parse_float32(value_str);
+
+                        // what is the binary destination format
+                        
+                    }
+                    else if (prop->m_property_type == TYPE_FLOAT64)
+                    {
+                        f64 f = parse_float64(value_str);
+                    }
+                    else if (type_is_int(prop->m_property_type))
+                    {
+                        s64 i = parse_int(value_str);
+                    }
+                    else if (type_is_uint(prop->m_property_type))
+                    {
+                        u64 i = parse_uint(value_str);
+                    }
+                }
+            }
+            return true;
+        }
+
+        void read_elements(ply_t* ply)
+        {
+            element_t* elem = ply->m_hdr->m_elements;
+            while (elem != nullptr)
+            {
+                read_element_data(ply, elem);
                 elem = elem->m_next;
             }
         }
 
-        void read(ply_t* ply) 
-        { 
-            read_header(ply); 
+        void read(ply_t* ply)
+        {
+            read_header(ply);
             read_elements(ply);
         }
 

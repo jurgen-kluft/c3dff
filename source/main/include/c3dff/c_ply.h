@@ -40,11 +40,13 @@ namespace ncore
         };
 
         struct ply_t;
-        static ply_t* create(allocator_t* allocator, linereader_t* line_reader);
-        static void set_ignore_property(ply_t* ply, const char* element_name, const char* property_name);
-        static void set_read_property(ply_t* ply, const char* element_name, const char* property_name, etype destination_type, s32 offset);
+        ply_t* create(allocator_t* allocator, linereader_t* line_reader);
 
-        static void read(ply_t* ply);
+        bool read_header(ply_t* ply);
+        bool set_ignore_property(ply_t* ply, const char* element_name, const char* property_name);
+        bool set_read_property(ply_t* ply, const char* element_name, const char* property_name, etype destination_type, s32 offset);
+
+        void read(ply_t* ply);
 
         template <typename T> class array_t
         {
@@ -53,10 +55,10 @@ namespace ncore
             T*   m_array;
         };
 
-        template <typename T> static array_t<T> get_array(ply_t* ply, const char* element_name);
+        template <typename T> array_t<T> get_array(ply_t* ply, const char* element_name);
 
-        static array_t<const char*> get_comments(ply_t* ply);
-        static array_t<const char*> get_obj_infos(ply_t* ply);
+        array_t<const char*> get_comments(ply_t* ply);
+        array_t<const char*> get_obj_infos(ply_t* ply);
 
     } // namespace nply
 
