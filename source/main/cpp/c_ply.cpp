@@ -156,7 +156,7 @@ namespace ncore
             string_t     m_name;
             u32          m_count;
             u32          m_binary_size; // size in bytes of one element
-            u32          m_prop_count;
+            s32          m_prop_count;
             property_t** m_prop_array;
             buffer_t     m_data;
             element_t*   m_next;
@@ -210,6 +210,7 @@ namespace ncore
             ply->m_hdr         = nullptr;
             ply->m_comments    = nullptr;
             ply->m_elements    = nullptr;
+            return ply;
         }
 
         static void add_comment(ply_t* ply, comment_t* comment)
@@ -530,34 +531,19 @@ namespace ncore
             return fint + fdec;
         }
 
-        // clang-format off
-        static inline u8* write_bytes(u8* dst, u8* src, s32 size) { while (size > 0) { *dst++ = v; --size; } return dst; }
-        static inline u8* write_u8(u8* dst, u8 v) { write_bytes(dst, (u8*)&v, 1); }
-        static inline u8* write_s8(u8* dst, s8 v) { write_bytes(dst, (u8*)&v, 1); }
-        static inline u8* write_u16(u8* dst, u16 v) { write_bytes(dst, (u8*)&v, 2); }
-        static inline u8* write_s16(u8* dst, s16 v) { write_bytes(dst, (u8*)&v, 2); }
-        static inline u8* write_u32(u8* dst, u32 v) { write_bytes(dst, (u8*)&v, 4); }
-        static inline u8* write_s32(u8* dst, s32 v) { write_bytes(dst, (u8*)&v, 4); }
-        static inline u8* write_f32(u8* dst, f32 v) { write_bytes(dst, (u8*)&v, 4); }
-        static inline u8* write_f64(u8* dst, f64 v) { write_bytes(dst, (u8*)&v, 8); }
-
-        // TODO: endian format
-
-        template <typename T> u8* write_data(T v, etype dst_type, u8* dst) { 
-            switch (dst_type) {
-            case TYPE_INT8    : { s8 i=(s8)v;   return write_s8(dst, i); }
-            case TYPE_UINT8   : { u8 i=(u8)v;   return write_u8(dst, i); }
-            case TYPE_INT16   : { s16 i=(s16)v; return write_s16(dst, i); }
-            case TYPE_UINT16  : { u16 i=(u16)v; return write_u16(dst, i); }
-            case TYPE_INT32   : { s32 i=(s32)v; return write_s32(dst, i); }
-            case TYPE_UINT32  : { u32 i=(u32)v; return write_u32(dst, i); }
-            case TYPE_FLOAT32 : { f32 i=(f32)v; return write_f32(dst, i); }
-            case TYPE_FLOAT64 : { f64 i=(f64)v; return write_f64(dst, i); }
+        static inline u8* write_bytes(u8* dst, u8 const* src, s32 size)
+        {
+            while (size > 0)
+            {
+                *dst++ = *src++;
+                --size;
             }
             return dst;
         }
 
-        // clang-format on
+        // TODO: endian format
+
+        template <typename T> u8* write_data(T v, etype dst_type, u8* dst) { return write_bytes(dst, (u8 const*)&v, type_sizeof(dst_type)); }
 
         bool read_element_asciidata(ply_t* ply, element_t* elem)
         {
@@ -585,7 +571,7 @@ namespace ncore
                     property_t* prop = elem->m_prop_array[i];
 
                     string_t value_str = read_token(line);
-                    
+
                     if (prop->m_property_type == TYPE_FLOAT32)
                     {
                         f32 f = parse_float32(value_str);

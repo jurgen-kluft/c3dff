@@ -1,11 +1,12 @@
 #include "cbase/c_target.h"
+#include "cbase/c_allocator.h"
 #include "c3dff/c_ply.h"
 #include "cunittest/cunittest.h"
 
 using namespace ncore;
 
-extern unsigned char   skull_txt[];
-extern unsigned int    skull_txt_len;
+extern unsigned char   skull_ply[];
+extern unsigned int    skull_ply_len;
 
 class line_reader_inline : public ncore::nply::linereader_t
 {
@@ -14,7 +15,16 @@ public:
 
     virtual bool read_line(const char*& str, const char*& end)
     {
-        return false;
+        str = m_str;
+        end = m_str;
+        while (*end != '\n' && *end != '\r' && end < m_end)
+        {
+            end++;
+        }
+        m_str = end;
+        while ((*m_str == '\n' || *m_str == '\r') && m_str < m_end)
+            m_str++;
+        return str < m_end;
     }
 
     const char* m_str;
@@ -22,17 +32,35 @@ public:
     const char* m_end;
 };
 
+extern ncore::alloc_t* gTestAllocator;
+
 class ply_allocator : public ncore::nply::allocator_t
 {
+    u8* m_memory;
+    u8* m_ptr;
+    u32 m_size;
+
 public:
+    void          init() 
+    { 
+        m_size   = 128 * 1024 * 1024;
+        m_memory = (u8*)gTestAllocator->allocate(m_size);
+        m_ptr    = m_memory;
+    }
+    void          exit() 
+    { 
+        gTestAllocator->deallocate(m_memory);
+    }
     virtual void* alloc(u32 size) 
     {
-        return nullptr;
+        u8* ptr = m_ptr;
+        m_ptr += (size + (16 - 1)) & ~(16 - 1);
+        return ptr;
     }
 
     void reset() 
     {
-
+        m_ptr = m_memory;
     }
 };
 
@@ -42,14 +70,14 @@ UNITTEST_SUITE_BEGIN(ply)
     {
         static ply_allocator sAllocator;
 
-        UNITTEST_FIXTURE_SETUP() {}
-        UNITTEST_FIXTURE_TEARDOWN() {}
+        UNITTEST_FIXTURE_SETUP(){sAllocator.init(); }
+        UNITTEST_FIXTURE_TEARDOWN() { sAllocator.exit(); }
 
         UNITTEST_TEST(test_read)
         {
-            line_reader_inline reader((const char*)skull_txt, skull_txt_len);
+            line_reader_inline reader((const char*)skull_ply, skull_ply_len);
             nply::ply_t* ply = nply::create(&sAllocator, &reader);
-            nply::read(ply);
+            nply::read_header(ply);
         }
     }
 }

@@ -33,8 +33,8 @@ namespace ncore
 
     public:
         UnitTestAllocator(ncore::alloc_t* allocator) { mAllocator = allocator; }
-        virtual void*   Allocate(xsize_t size) { return mAllocator->allocate((u32)size, sizeof(void*)); }
-        virtual xsize_t Deallocate(void* ptr) { return mAllocator->deallocate(ptr); }
+        virtual void*   Allocate(uint_t size) { return mAllocator->allocate((u32)size, sizeof(void*)); }
+        virtual uint_t  Deallocate(void* ptr) { return mAllocator->deallocate(ptr); }
     };
 
     class TestAllocator : public alloc_t
@@ -70,7 +70,7 @@ ncore::UnitTestAssertHandler gAssertHandler;
 
 bool gRunUnitTest(UnitTest::TestReporter& reporter)
 {
-    xbase::init();
+    cbase::init();
 
 #ifdef TARGET_DEBUG
     ncore::context_t::set_assert_handler(&gAssertHandler);
@@ -100,6 +100,6 @@ bool gRunUnitTest(UnitTest::TestReporter& reporter)
     UnitTest::SetAllocator(NULL);
     ncore::context_t::set_system_alloc(systemAllocator);
 
-    xbase::exit();
+    cbase::exit();
     return r == 0;
 }
