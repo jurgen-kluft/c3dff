@@ -15,15 +15,15 @@ public:
 
     virtual bool read_line(const char*& str, const char*& end)
     {
-        str = m_str;
-        end = m_str;
+        str = m_cursor;
+        end = m_cursor;
         while (*end != '\n' && *end != '\r' && end < m_end)
         {
             end++;
         }
-        m_str = end;
-        while ((*m_str == '\n' || *m_str == '\r') && m_str < m_end)
-            m_str++;
+        m_cursor = end;
+        while ((*m_cursor == '\n' || *m_cursor == '\r') && m_cursor < m_end)
+            m_cursor++;
         return str < m_end;
     }
 
@@ -47,12 +47,15 @@ public:
         m_memory = (u8*)gTestAllocator->allocate(m_size);
         m_ptr    = m_memory;
     }
+
     void          exit() 
     { 
         gTestAllocator->deallocate(m_memory);
     }
+
     virtual void* alloc(u32 size) 
     {
+        ASSERT(size < ((m_memory+m_size) - m_ptr));
         u8* ptr = m_ptr;
         m_ptr += (size + (16 - 1)) & ~(16 - 1);
         return ptr;

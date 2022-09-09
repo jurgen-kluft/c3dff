@@ -53,7 +53,7 @@ namespace ncore
         template <typename T> class array_t
         {
         public:
-            u32* m_count;
+            u32  m_count;
             T*   m_array;
         };
 
