@@ -6,22 +6,6 @@ namespace ncore
 {
     namespace nply
     {
-        inline static s32  type_sizeof(etype type) { return (type & TYPE_SIZE_MASK); }
-        inline static s32  type_index(etype type) { return (type & TYPE_INDEX_MASK) >> TYPE_INDEX_SHIFT; }
-        inline static bool type_is_list(etype type) { return (type & TYPE_LIST) == TYPE_LIST; }
-        inline static bool type_is_int(etype type) { return (type & TYPE_SIGNED) == TYPE_SIGNED; }
-        inline static bool type_is_int8(etype type) { return type_is_int(type) && (type_sizeof(type) == 1); }
-        inline static bool type_is_int16(etype type) { return type_is_int(type) && (type_sizeof(type) == 2); }
-        inline static bool type_is_int32(etype type) { return type_is_int(type) && (type_sizeof(type) == 4); }
-        inline static bool type_is_int64(etype type) { return type_is_int(type) && (type_sizeof(type) == 8); }
-        inline static bool type_is_uint(etype type) { return (type & TYPE_UNSIGNED) == TYPE_UNSIGNED; }
-        inline static bool type_is_uint8(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
-        inline static bool type_is_uint16(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
-        inline static bool type_is_uint32(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
-        inline static bool type_is_uint64(etype type) { return type_is_uint(type) && (type_sizeof(type) == 1); }
-        inline static bool type_is_f32(etype type) { return (type & TYPE_FLOAT32) == TYPE_FLOAT32; }
-        inline static bool type_is_f64(etype type) { return (type & TYPE_FLOAT64) == TYPE_FLOAT64; }
-        inline static bool type_is_float(etype type) { return type_is_f32(type) || type_is_f64(type); }
 
         struct string_t
         {
@@ -141,9 +125,6 @@ namespace ncore
             string_t m_name;
             etype    m_property_type;
             etype    m_list_count_type;
-            etype    m_binary_property_type;
-            etype    m_binary_list_count_type;
-            s32      m_binary_offset;
         };
 
         struct buffer_t
@@ -155,12 +136,12 @@ namespace ncore
         struct element_t
         {
             string_t     m_name;
+            u32          m_index;
             u32          m_count;
-            u32          m_binary_size; // size in bytes of one element
             s32          m_prop_count;
             property_t** m_prop_array;
-            buffer_t     m_data;    // the array of elements
-            buffer_t     m_content; // the data/content for each element
+            etype*       m_prop_type_array;
+            s32*         m_prop_index_array;
             element_t*   m_next;
         };
 
@@ -333,9 +314,6 @@ namespace ncore
                 prop->m_property_type   = parse_type(type_token);
                 prop->m_name            = make_string(ply, property_name);
             }
-            prop->m_binary_property_type   = prop->m_property_type;
-            prop->m_binary_list_count_type = prop->m_list_count_type;
-            prop->m_binary_offset          = 0;
             return prop;
         }
 
@@ -400,11 +378,16 @@ namespace ncore
                             } while (token.is_empty());
                         } while (token == "property");
 
-                        element->m_prop_count = prop_count;
-                        element->m_prop_array = (property_t**)ply->m_alloc->alloc(sizeof(property_t*) * prop_count);
+                        element->m_prop_count       = prop_count;
+                        element->m_prop_array       = (property_t**)ply->m_alloc->alloc(sizeof(property_t*) * prop_count);
+                        element->m_prop_type_array  = (etype*)ply->m_alloc->alloc(sizeof(etype) * prop_count);
+                        element->m_prop_index_array = (s32*)ply->m_alloc->alloc(sizeof(s32) * prop_count);
                         for (s32 i = 0; i < prop_count; i++)
                         {
-                            element->m_prop_array[i] = properties[i];
+                            property_t* prop               = properties[i];
+                            element->m_prop_array[i]       = prop;
+                            element->m_prop_type_array[i]  = prop->m_property_type;
+                            element->m_prop_index_array[i] = i;
                         }
                         continue;
                     }
@@ -422,51 +405,37 @@ namespace ncore
             return false;
         }
 
-        bool set_ignore_property(ply_t* ply, const char* element_name, const char* property_name)
+        u32  get_element_count(ply_t* ply, const char* element_name)
+        {
+            element_t* elem = ply->m_hdr->m_elements;
+            while (elem != nullptr)
+            {
+                if (elem->m_name == element_name)
+                    return elem->m_count;
+                elem = elem->m_next;
+            }
+            return 0;
+        }
+
+        void set_element_index(ply_t* ply, const char* element_name, s32 index)
         {
             element_t* elem = ply->m_hdr->m_elements;
             while (elem != nullptr)
             {
                 if (elem->m_name == element_name)
                 {
-                    for (s32 i = 0; i < elem->m_prop_count; i++)
-                    {
-                        property_t* prop = elem->m_prop_array[i];
-                        if (prop->m_name == property_name)
-                        {
-                            prop->m_binary_offset        = -1;
-                            prop->m_binary_property_type = TYPE_INVALID;
-                            return true;
-                        }
-                    }
+                    elem->m_index = index;
+                    break;
                 }
                 elem = elem->m_next;
             }
+        }
+        
+        bool set_property_index(ply_t* ply, const char* element_name, const char* property_name, s32 index)
+        {
             return false;
         }
 
-        bool set_read_property(ply_t* ply, const char* element_name, const char* property_name, etype destination_type, s32 offset)
-        {
-            element_t* elem = ply->m_hdr->m_elements;
-            while (elem != nullptr)
-            {
-                if (elem->m_name == element_name)
-                {
-                    for (s32 i = 0; i < elem->m_prop_count; i++)
-                    {
-                        property_t* prop = elem->m_prop_array[i];
-                        if (prop->m_name == property_name)
-                        {
-                            prop->m_binary_offset        = offset;
-                            prop->m_binary_property_type = destination_type;
-                            return true;
-                        }
-                    }
-                }
-                elem = elem->m_next;
-            }
-            return false;
-        }
 
         static inline void trim_whitespace(const char*& str, const char*& end)
         {
@@ -545,6 +514,78 @@ namespace ncore
             return fint + fdec;
         }
 
+        u32 handler_t::get_offset(s32 property_index, etype* property_type_array, s32 property_count)
+        {
+            ASSERT(property_index < property_count);
+            u32 offset = 0;
+            D_FOR_I(0, property_index) { offset += type_sizeof(property_type_array[i]); }
+            return offset;
+        }
+
+        static s64 read_int(etype property_type, u32 property_offset, void* property_data)
+        {
+            s64 v = 0;
+            switch (property_type)
+            {
+                case TYPE_INT8: v = *((s8*)((u8*)property_data + property_offset)); break;
+                case TYPE_INT16: v = *((s16*)((u8*)property_data + property_offset)); break;
+                case TYPE_INT32: v = *((s32*)((u8*)property_data + property_offset)); break;
+                default: break;
+            }
+            return v;
+        }
+        static u64 read_uint(etype property_type, u32 property_offset, void* property_data)
+        {
+            u64 v = 0;
+            switch (property_type)
+            {
+                case TYPE_UINT8: v = *((u8*)((u8*)property_data + property_offset)); break;
+                case TYPE_UINT16: v = *((u16*)((u8*)property_data + property_offset)); break;
+                case TYPE_UINT32: v = *((u32*)((u8*)property_data + property_offset)); break;
+                default: break;
+            }
+            return v;
+        }
+        static f32 read_float32(f32 _default, etype property_type, u32 property_offset, void* property_data)
+        {
+            switch (property_type)
+            {
+                case TYPE_FLOAT32: return *((f32*)((u8*)property_data + property_offset));
+                default: break;
+            }
+            return _default;
+        }
+        static f64 read_float64(f64 _default, etype property_type, u32 property_offset, void* property_data)
+        {
+            switch (property_type)
+            {
+                case TYPE_FLOAT64: return *((f64*)((u8*)property_data + property_offset));
+                default: break;
+            }
+            return _default;
+        }
+
+        template <typename T> T read_integer(T _default, etype property_type, u32 property_offset, void* property_data)
+        {
+            switch (type_type(property_type))
+            {
+                case TYPE_SIGNED: return (T)read_int(property_type, property_offset, property_data);
+                case TYPE_UNSIGNED: return (T)read_uint(property_type, property_offset, property_data);
+                default: break;
+            }
+            return _default;
+        }
+
+        s8  handler_t::read_s8(etype property_type, u32 property_offset, void* property_data) { return read_integer<s8>(0, property_type, property_offset, property_data); }
+        s16 handler_t::read_s16(etype property_type, u32 property_offset, void* property_data) { return read_integer<s16>(0, property_type, property_offset, property_data); }
+        s32 handler_t::read_s32(etype property_type, u32 property_offset, void* property_data) { return read_integer<s32>(0, property_type, property_offset, property_data); }
+        u8  handler_t::read_u8(etype property_type, u32 property_offset, void* property_data) { return read_integer<u8>(0, property_type, property_offset, property_data); }
+        u16 handler_t::read_u16(etype property_type, u32 property_offset, void* property_data) { return read_integer<u16>(0, property_type, property_offset, property_data); }
+        u32 handler_t::read_u32(etype property_type, u32 property_offset, void* property_data) { return read_integer<u32>(0, property_type, property_offset, property_data); }
+        f32 handler_t::read_f32(etype property_type, u32 property_offset, void* property_data) { return read_float32(0.0f, property_type, property_offset, property_data); }
+        f64 handler_t::read_f64(etype property_type, u32 property_offset, void* property_data) { return read_float64(0.0, property_type, property_offset, property_data); }
+
+        // TODO: endian format
         static inline u8* write_bytes(u8* dst, u8 const* src, s32 size)
         {
             while (size > 0)
@@ -555,22 +596,11 @@ namespace ncore
             return dst;
         }
 
-        // TODO: endian format
+        template <typename T> u8* write_data(T v, u8* dst) { return write_bytes(dst, (u8 const*)&v, sizeof(T)); }
 
-        template <typename T> u8* write_data(T v, etype dst_type, u8* dst) { return write_bytes(dst, (u8 const*)&v, type_sizeof(dst_type)); }
-
-        bool read_element_asciidata(ply_t* ply, element_t* elem)
+        bool read_element_asciidata(ply_t* ply, element_t* elem, handler_t** handler_array, s32 handler_count)
         {
-            elem->m_binary_size = 0;
-            for (s32 i = 0; i < elem->m_prop_count; i++)
-            {
-                property_t* prop = elem->m_prop_array[i];
-                elem->m_binary_size += prop->m_list_count_type * (prop->m_binary_property_type & TYPE_SIZE_MASK);
-            }
-
-            elem->m_data.m_buffer = (u8*)ply->m_alloc->alloc(elem->m_binary_size * elem->m_count);
-
-            u8* dst = elem->m_data.m_buffer;
+            u8 dst_buffer[128];
             for (s64 i = 0; i < elem->m_count; i++)
             {
                 string_t line;
@@ -580,7 +610,8 @@ namespace ncore
                         return false;
                 } while (line.is_empty());
 
-                for (s32 i = 0; i < elem->m_prop_count; ++i)
+                u8* dst = dst_buffer;
+                D_FOR(s32, i, 0, elem->m_prop_count)
                 {
                     property_t* prop = elem->m_prop_array[i];
 
@@ -589,69 +620,70 @@ namespace ncore
                     if (prop->m_property_type == TYPE_FLOAT32)
                     {
                         f32 f = parse_float32(value_str);
-                        write_data<f32>(f, prop->m_binary_property_type, dst);
+                        write_data<f32>(f, dst);
                     }
                     else if (prop->m_property_type == TYPE_FLOAT64)
                     {
                         f64 f = parse_float64(value_str);
-                        write_data<f64>(f, prop->m_binary_property_type, dst);
+                        write_data<f64>(f, dst);
                     }
                     else if (type_is_int(prop->m_property_type))
                     {
                         s64 i = parse_int(value_str);
-                        write_data<s64>(i, prop->m_binary_property_type, dst);
+                        switch (prop->m_property_type)
+                        {
+                            case TYPE_INT8: write_data<s8>(i, dst); break;
+                            case TYPE_INT16: write_data<s16>(i, dst); break;
+                            case TYPE_INT32: write_data<s32>(i, dst); break;
+                            default: break;
+                        }
                     }
                     else if (type_is_uint(prop->m_property_type))
                     {
                         u64 i = parse_uint(value_str);
-                        write_data<u64>(i, prop->m_binary_property_type, dst);
+                        switch (prop->m_property_type)
+                        {
+                            case TYPE_UINT8: write_data<u8>(i, dst); break;
+                            case TYPE_UINT16: write_data<u16>(i, dst); break;
+                            case TYPE_UINT32: write_data<u32>(i, dst); break;
+                            default: break;
+                        }
                     }
                 }
+
+                D_FOR(s32, i, 0, handler_count)
+                handler_array[i]->read(elem->m_index, elem->m_prop_type_array, elem->m_prop_count, dst);
             }
             return true;
         }
 
-        void read_elements_ascii(ply_t* ply)
+        void read_elements_ascii(ply_t* ply, handler_t** handler_array, s32 handler_count)
         {
             element_t* elem = ply->m_hdr->m_elements;
             while (elem != nullptr)
             {
-                read_element_asciidata(ply, elem);
+                read_element_asciidata(ply, elem, handler_array, handler_count);
                 elem = elem->m_next;
             }
         }
 
-        void read_data(ply_t* ply)
+        void read_data(ply_t* ply, handler_t* handler1, handler_t* handler2)
         {
-            // for each element pre-compute the binary size and also pre-compute the binary offset of each property
+            s32 const  handler_count    = 2;
+            handler_t* handler_array[2] = {handler1, handler2};
+
             element_t* elem = ply->m_hdr->m_elements;
             while (elem != nullptr)
             {
-                u32 binary_offset = 0;
-                for (s32 i = 0; i < elem->m_prop_count; i++)
-                {
-                    if (elem->m_prop_array[i]->m_binary_property_type != TYPE_INVALID)
-                    {
-                        elem->m_prop_array[i]->m_binary_offset = binary_offset;
-                        if (type_is_list(elem->m_prop_array[i]->m_binary_property_type))
-                        {
-                            binary_offset += type_sizeof(elem->m_prop_array[i]->m_binary_list_count_type);
-                            binary_offset += sizeof(void*); // the pointer to the data
-                        }
-                        binary_offset += type_sizeof(elem->m_prop_array[i]->m_binary_property_type);
-                    }
-                }
-                elem->m_binary_size = binary_offset;
-                elem                = elem->m_next;
+                for (s32 i = 0; i < handler_count; ++i)
+                    handler_array[i]->setup(elem->m_index, elem->m_count, elem->m_prop_type_array, elem->m_prop_index_array, elem->m_prop_count);
+                elem = elem->m_next;
             }
-
-            // TODO: List items will get a pointer to their actual data, so we can pre-allocate the objects but
-            //       their data needs to be a 'checkout'/'commit' mechanic.
 
             // now read in the data, can be in ASCII or BINARY format
             if (ply->m_hdr->m_format == FORMAT_ASCII)
             {
-                read_elements_ascii(ply);
+                read_elements_ascii(ply, handler_array, handler_count);
             }
             else
             {
