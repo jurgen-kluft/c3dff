@@ -15,10 +15,13 @@ namespace ncore
             virtual void* alloc(u32 size) = 0;
         };
 
-        class linereader_t
+        const char* g_ReadLine(const char* text_cursor, const char* text_end, const char*& str, const char*& end);
+
+        class reader_t
         {
         public:
             virtual bool read_line(const char*& str, const char*& end) = 0;
+            virtual bool read_data(u32 size, const u8*& begin, const u8*& end) = 0;
         };
 
         enum etype
@@ -193,14 +196,14 @@ namespace ncore
         };
 
         struct ply_t;
-        ply_t* create(allocator_t* allocator, linereader_t* line_reader);
+        ply_t* create(allocator_t* allocator);
 
-        bool read_header(ply_t* ply);
+        bool read_header(ply_t* ply, reader_t* reader);
         u32  get_element_count(ply_t* ply, const char* element_name);
         void set_element_index(ply_t* ply, const char* element_name, s32 index);
         bool set_property_index(ply_t* ply, const char* element_name, const char* property_name, s32 index);
 
-        void read_data(ply_t* ply, handler_t* handler1, handler_t* handler2);
+        void read_data(ply_t* ply, reader_t* reader, handler_t* handler1, handler_t* handler2);
 
     } // namespace nply
 

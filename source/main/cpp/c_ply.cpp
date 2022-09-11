@@ -6,6 +6,19 @@ namespace ncore
 {
     namespace nply
     {
+        const char* g_ReadLine(const char* text_cursor, const char* text_end, const char*& str, const char*& end)
+        {
+            str = text_cursor;
+            end = text_cursor;
+            while (*end != '\n' && *end != '\r' && end < text_end)
+            {
+                end++;
+            }
+            text_cursor = end;
+            while ((*text_cursor == '\n' || *text_cursor == '\r') && text_cursor < text_end)
+                text_cursor++;
+            return text_cursor;
+        }
 
         struct string_t
         {
@@ -178,22 +191,20 @@ namespace ncore
 
         struct ply_t
         {
-            allocator_t*  m_alloc;
-            linereader_t* m_line_reader;
-            header_t*     m_hdr;
-            comment_t*    m_comments;
-            objinfo_t*    m_obj_info;
-            element_t*    m_elements;
+            allocator_t* m_alloc;
+            header_t*    m_hdr;
+            comment_t*   m_comments;
+            objinfo_t*   m_obj_info;
+            element_t*   m_elements;
         };
 
-        ply_t* create(allocator_t* allocator, linereader_t* line_reader)
+        ply_t* create(allocator_t* allocator)
         {
-            ply_t* ply         = construct<ply_t>(allocator);
-            ply->m_alloc       = allocator;
-            ply->m_line_reader = line_reader;
-            ply->m_hdr         = nullptr;
-            ply->m_comments    = nullptr;
-            ply->m_elements    = nullptr;
+            ply_t* ply      = construct<ply_t>(allocator);
+            ply->m_alloc    = allocator;
+            ply->m_hdr      = nullptr;
+            ply->m_comments = nullptr;
+            ply->m_elements = nullptr;
             return ply;
         }
 
@@ -322,7 +333,7 @@ namespace ncore
             // @todo: need information, haven't seen any .ply files with this
         }
 
-        bool read_header(ply_t* ply)
+        bool read_header(ply_t* ply, reader_t* reader)
         {
             ply->m_hdr                 = construct<header_t>(ply->m_alloc);
             ply->m_hdr->m_format       = FORMAT_ASCII;
@@ -337,7 +348,7 @@ namespace ncore
             element_t* element = nullptr;
 
             string_t line;
-            while (ply->m_line_reader->read_line(line.m_str, line.m_end))
+            while (reader->read_line(line.m_str, line.m_end))
             {
                 string_t token = read_token(line);
 
@@ -372,7 +383,7 @@ namespace ncore
                             properties[prop_count++] = read_header_property(ply, element, line);
                             do
                             {
-                                if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
+                                if (!reader->read_line(line.m_str, line.m_end))
                                     return false;
                                 token = read_token(line);
                             } while (token.is_empty());
@@ -405,7 +416,7 @@ namespace ncore
             return false;
         }
 
-        u32  get_element_count(ply_t* ply, const char* element_name)
+        u32 get_element_count(ply_t* ply, const char* element_name)
         {
             element_t* elem = ply->m_hdr->m_elements;
             while (elem != nullptr)
@@ -430,12 +441,8 @@ namespace ncore
                 elem = elem->m_next;
             }
         }
-        
-        bool set_property_index(ply_t* ply, const char* element_name, const char* property_name, s32 index)
-        {
-            return false;
-        }
 
+        bool set_property_index(ply_t* ply, const char* element_name, const char* property_name, s32 index) { return false; }
 
         static inline void trim_whitespace(const char*& str, const char*& end)
         {
@@ -598,7 +605,7 @@ namespace ncore
 
         template <typename T> u8* write_data(T v, u8* dst) { return write_bytes(dst, (u8 const*)&v, sizeof(T)); }
 
-        bool read_element_asciidata(ply_t* ply, element_t* elem, handler_t** handler_array, s32 handler_count)
+        bool read_element_data_ascii(ply_t* ply, reader_t* reader, element_t* elem, handler_t** handler_array, s32 handler_count)
         {
             u8 dst_buffer[128];
             for (s64 i = 0; i < elem->m_count; i++)
@@ -606,7 +613,7 @@ namespace ncore
                 string_t line;
                 do
                 {
-                    if (!ply->m_line_reader->read_line(line.m_str, line.m_end))
+                    if (!reader->read_line(line.m_str, line.m_end))
                         return false;
                 } while (line.is_empty());
 
@@ -657,17 +664,17 @@ namespace ncore
             return true;
         }
 
-        void read_elements_ascii(ply_t* ply, handler_t** handler_array, s32 handler_count)
+        void read_elements_ascii(ply_t* ply, reader_t* reader, handler_t** handler_array, s32 handler_count)
         {
             element_t* elem = ply->m_hdr->m_elements;
             while (elem != nullptr)
             {
-                read_element_asciidata(ply, elem, handler_array, handler_count);
+                read_element_data_ascii(ply, reader, elem, handler_array, handler_count);
                 elem = elem->m_next;
             }
         }
 
-        void read_data(ply_t* ply, handler_t* handler1, handler_t* handler2)
+        void read_data(ply_t* ply, reader_t* reader, handler_t* handler1, handler_t* handler2)
         {
             s32 const  handler_count    = 2;
             handler_t* handler_array[2] = {handler1, handler2};
@@ -683,7 +690,7 @@ namespace ncore
             // now read in the data, can be in ASCII or BINARY format
             if (ply->m_hdr->m_format == FORMAT_ASCII)
             {
-                read_elements_ascii(ply, handler_array, handler_count);
+                read_elements_ascii(ply, reader, handler_array, handler_count);
             }
             else
             {

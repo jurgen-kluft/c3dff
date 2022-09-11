@@ -8,10 +8,10 @@ using namespace ncore;
 extern unsigned char skull_ply[];
 extern unsigned int  skull_ply_len;
 
-class line_reader_inline : public ncore::nply::linereader_t
+class reader_test : public ncore::nply::reader_t
 {
 public:
-    line_reader_inline(const char* str, u32 len)
+    reader_test(const char* str, u32 len)
         : m_str(str)
         , m_cursor(str)
         , m_end(str + len)
@@ -20,16 +20,25 @@ public:
 
     virtual bool read_line(const char*& str, const char*& end)
     {
-        str = m_cursor;
-        end = m_cursor;
-        while (*end != '\n' && *end != '\r' && end < m_end)
+        const char* cursor = ncore::nply::g_ReadLine(m_cursor, m_end, str, end);
+        if (cursor > m_cursor)
         {
-            end++;
+            m_cursor = cursor;
+            return true;
         }
-        m_cursor = end;
-        while ((*m_cursor == '\n' || *m_cursor == '\r') && m_cursor < m_end)
-            m_cursor++;
-        return str < m_end;
+        return false;
+    }
+
+    virtual bool read_data(u32 size, const u8*& begin, const u8*& end)
+    {
+        if ((m_cursor + size) <= m_end)
+        {
+            begin    = (const u8*)m_cursor;
+            m_cursor = m_cursor + size;
+            end      = (const u8*)m_cursor;
+            return true;
+        }
+        return false;
     }
 
     const char* m_str;
@@ -79,20 +88,20 @@ UNITTEST_SUITE_BEGIN(ply)
         {
             sAllocator.reset();
 
-            line_reader_inline reader((const char*)skull_ply, skull_ply_len);
-            nply::ply_t*       ply = nply::create(&sAllocator, &reader);
+            nply::ply_t* ply = nply::create(&sAllocator);
 
-            CHECK_TRUE(nply::read_header(ply));
+            reader_test reader((const char*)skull_ply, skull_ply_len);
+            CHECK_TRUE(nply::read_header(ply, &reader));
             {
-                u32 const       vertex_count = get_element_count(ply, "vertex");
-                nply::vertex_t* vertex_array = (nply::vertex_t*)sAllocator.alloc(sizeof(nply::vertex_t) * vertex_count);
+                u32 const                vertex_count = get_element_count(ply, "vertex");
+                nply::vertex_t*          vertex_array = (nply::vertex_t*)sAllocator.alloc(sizeof(nply::vertex_t) * vertex_count);
                 nply::vertices_handler_t vertices_handler(vertex_array, vertex_count);
 
                 u32 const                 triangle_count = get_element_count(ply, "face");
                 nply::triangle_t*         triangle_array = (nply::triangle_t*)sAllocator.alloc(sizeof(nply::triangle_t) * triangle_count);
                 nply::triangles_handler_t triangles_handler(triangle_array, triangle_count);
 
-                nply::read_data(ply, &vertices_handler, &triangles_handler);
+                nply::read_data(ply, &reader, &vertices_handler, &triangles_handler);
             }
         }
     }
