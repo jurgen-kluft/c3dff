@@ -47,8 +47,6 @@ namespace ncore
         {
         }
 
-        virtual const char* name() const { return "xbase unittest test heap allocator"; }
-
         virtual void* v_allocate(u32 size, u32 alignment)
         {
             UnitTest::IncNumAllocations();
