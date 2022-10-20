@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	. "github.com/jurgen-kluft/c3dff/go"
+	. "github.com/jurgen-kluft/c3dff/go/g3dff"
 )
 
 func timed(name string) func() {
