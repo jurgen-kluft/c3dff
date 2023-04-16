@@ -46,19 +46,19 @@ public:
     const char* m_end;
 };
 
-extern ncore::alloc_t* gTestAllocator;
-
 class ply_allocator : public ncore::nply::allocator_t
 {
+    UnitTest::TestAllocator* m_allocator;
     u8* m_memory;
     u8* m_ptr;
     u32 m_size;
 
 public:
-    void init()
+    void init(UnitTest::TestAllocator* allocator)
     {
+        m_allocator = allocator;
         m_size   = 128 * 1024 * 1024;
-        m_memory = (u8*)gTestAllocator->allocate(m_size);
+        m_memory = (u8*)m_allocator->allocate(m_size, 8);
         m_ptr    = m_memory;
     }
 
@@ -79,9 +79,9 @@ UNITTEST_SUITE_BEGIN(ply)
 {
     UNITTEST_FIXTURE(main)
     {
-        static ply_allocator sAllocator;
+        static ply_allocator sAllocator();
 
-        UNITTEST_FIXTURE_SETUP() { sAllocator.init(); }
+        UNITTEST_FIXTURE_SETUP() { sAllocator.init(&TestAllocator); }
         UNITTEST_FIXTURE_TEARDOWN() { sAllocator.exit(); }
 
         UNITTEST_TEST(test_read)
