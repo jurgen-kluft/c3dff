@@ -525,7 +525,11 @@ namespace ncore
         {
             ASSERT(property_index < property_count);
             u32 offset = 0;
-            D_FOR_I(0, property_index) { offset += type_sizeof(property_type_array[i]); }
+            // D_FOR_I(0, property_index)
+            for (s32 i = 0; i < property_index; i++)
+            {
+                offset += type_sizeof(property_type_array[i]);
+            }
             return offset;
         }
 
@@ -618,7 +622,8 @@ namespace ncore
                 } while (line.is_empty());
 
                 u8* dst = dst_buffer;
-                D_FOR(s32, i, 0, elem->m_prop_count)
+                // D_FOR(s32, i, 0, elem->m_prop_count)
+                for (s32 i = 0; i < elem->m_prop_count; i++)
                 {
                     property_t* prop = elem->m_prop_array[i];
 
@@ -658,8 +663,9 @@ namespace ncore
                     }
                 }
 
-                D_FOR(s32, i, 0, handler_count)
-                handler_array[i]->read(elem->m_index, elem->m_prop_type_array, elem->m_prop_count, dst);
+                // D_FOR(s32, i, 0, handler_count)
+                for (s32 i = 0; i < handler_count; i++)
+                    handler_array[i]->read(elem->m_index, elem->m_prop_type_array, elem->m_prop_count, dst);
             }
             return true;
         }

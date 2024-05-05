@@ -1,7 +1,9 @@
 #include "ccore/c_target.h"
 #include "cbase/c_allocator.h"
 #include "c3dff/c_ply.h"
+
 #include "cunittest/cunittest.h"
+#include "c3dff/test_allocator.h"
 
 using namespace ncore;
 
@@ -48,21 +50,21 @@ public:
 
 class ply_allocator : public ncore::nply::allocator_t
 {
-    UnitTest::TestAllocator* m_allocator;
-    u8* m_memory;
-    u8* m_ptr;
-    u32 m_size;
+    alloc_t* m_allocator;
+    u8*      m_memory;
+    u8*      m_ptr;
+    u32      m_size;
 
 public:
-    void init(UnitTest::TestAllocator* allocator)
+    void init(alloc_t* allocator)
     {
         m_allocator = allocator;
-        m_size   = 128 * 1024 * 1024;
-        m_memory = (u8*)m_allocator->allocate(m_size, 8);
-        m_ptr    = m_memory;
+        m_size      = 128 * 1024 * 1024;
+        m_memory    = (u8*)m_allocator->allocate(m_size, 8);
+        m_ptr       = m_memory;
     }
 
-    void exit() { gTestAllocator->deallocate(m_memory); }
+    void exit() { m_allocator->deallocate(m_memory); }
 
     virtual void* alloc(u32 size)
     {
@@ -79,26 +81,33 @@ UNITTEST_SUITE_BEGIN(ply)
 {
     UNITTEST_FIXTURE(main)
     {
-        static ply_allocator sAllocator();
+        UNITTEST_ALLOCATOR;
 
-        UNITTEST_FIXTURE_SETUP() { sAllocator.init(&TestAllocator); }
-        UNITTEST_FIXTURE_TEARDOWN() { sAllocator.exit(); }
+        static ply_allocator  s_ply_allocator;
+        static ply_allocator* sAllocator = nullptr;
+
+        UNITTEST_FIXTURE_SETUP()
+        {
+            sAllocator = &s_ply_allocator;
+            sAllocator->init(Allocator);
+        }
+        UNITTEST_FIXTURE_TEARDOWN() { sAllocator->exit(); }
 
         UNITTEST_TEST(test_read)
         {
-            sAllocator.reset();
+            sAllocator->reset();
 
-            nply::ply_t* ply = nply::create(&sAllocator);
+            nply::ply_t* ply = nply::create(sAllocator);
 
             reader_test reader((const char*)skull_ply, skull_ply_len);
             CHECK_TRUE(nply::read_header(ply, &reader));
             {
                 u32 const                vertex_count = get_element_count(ply, "vertex");
-                nply::vertex_t*          vertex_array = (nply::vertex_t*)sAllocator.alloc(sizeof(nply::vertex_t) * vertex_count);
+                nply::vertex_t*          vertex_array = (nply::vertex_t*)sAllocator->alloc(sizeof(nply::vertex_t) * vertex_count);
                 nply::vertices_handler_t vertices_handler(vertex_array, vertex_count);
 
                 u32 const                 triangle_count = get_element_count(ply, "face");
-                nply::triangle_t*         triangle_array = (nply::triangle_t*)sAllocator.alloc(sizeof(nply::triangle_t) * triangle_count);
+                nply::triangle_t*         triangle_array = (nply::triangle_t*)sAllocator->alloc(sizeof(nply::triangle_t) * triangle_count);
                 nply::triangles_handler_t triangles_handler(triangle_array, triangle_count);
 
                 nply::read_data(ply, &reader, &vertices_handler, &triangles_handler);

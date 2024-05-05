@@ -2,7 +2,7 @@
 #define __C_3DFF_PLY_H__
 #include "ccore/c_target.h"
 #ifdef USE_PRAGMA_ONCE
-#pragma once
+#    pragma once
 #endif
 
 namespace ncore
@@ -20,7 +20,7 @@ namespace ncore
         class reader_t
         {
         public:
-            virtual bool read_line(const char*& str, const char*& end) = 0;
+            virtual bool read_line(const char*& str, const char*& end)         = 0;
             virtual bool read_data(u32 size, const u8*& begin, const u8*& end) = 0;
         };
 
@@ -114,7 +114,7 @@ namespace ncore
                 , m_vertex_count(0)
                 , m_vertex_array(vertex_array)
             {
-                D_FOR_I(0, 3)
+                for (int i = 0; i < 3; i++)
                 {
                     m_property_type[i]   = TYPE_INVALID;
                     m_property_offset[i] = 0;
@@ -125,7 +125,7 @@ namespace ncore
             {
                 if (element_index == INDEX_VERTEX)
                 {
-                    D_FOR_I(0, property_count)
+                    for (int i = 0; i < property_count; i++)
                     {
                         if (property_index_array[i] >= 0)
                         {
@@ -166,7 +166,10 @@ namespace ncore
                 , m_triangle_array(triangle_array)
             {
                 m_property_type = TYPE_INVALID;
-                D_FOR_I(0, 3) { m_property_offset[i] = 0; }
+                for (int i = 0; i < 4; i++)
+                {
+                    m_property_offset[i] = 0;
+                }
             }
 
             virtual bool setup(s32 element_index, int_t num_items, etype* property_type_array, s32* property_index_array, s32 property_count)
@@ -175,7 +178,10 @@ namespace ncore
                 {
                     ASSERT(type_is_list(property_type_array[0]));
                     m_property_type = property_type_array[1];
-                    D_FOR_I(0, 4) { m_property_offset[i] = get_offset(i, property_type_array, property_count); }
+                    for (int i = 0; i < 4; i++)
+                    {
+                        m_property_offset[i] = get_offset(i, property_type_array, property_count);
+                    }
                     return true;
                 }
                 return false;
