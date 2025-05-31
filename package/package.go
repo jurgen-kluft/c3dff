@@ -21,23 +21,27 @@ func GetPackage() *denv.Package {
 	unittestpkg := cunittest.GetPackage()
 
 	// The main (c3dff) package
-	mainpkg := denv.NewPackage(name)
+	mainpkg := denv.NewPackage(repo_path, repo_name)
 	mainpkg.AddPackage(basepkg)
 	mainpkg.AddPackage(corepkg)
 
 	// library
-	mainlib := denv.SetupCppLibProject(name, repo_path+name)
+	mainlib := denv.SetupCppLibProject(mainpkg, name)
 	mainlib.AddDependencies(basepkg.GetMainLib()...)
 	mainlib.AddDependencies(corepkg.GetMainLib()...)
 
+	// test library
+	testlib := denv.SetupCppTestLibProject(mainpkg, name)
+	testlib.AddDependencies(basepkg.GetTestLib()...)
+	testlib.AddDependencies(corepkg.GetTestLib()...)
+
 	// unittest project
-	maintest := denv.SetupCppTestProject(name+"_test", repo_path+name)
-	maintest.AddDependencies(basepkg.GetMainLib()...)
-	maintest.AddDependencies(corepkg.GetMainLib()...)
+	maintest := denv.SetupCppTestProject(mainpkg, name)
 	maintest.AddDependencies(unittestpkg.GetMainLib()...)
-	maintest.AddDependency(mainlib)
+	maintest.AddDependency(testlib)
 
 	mainpkg.AddMainLib(mainlib)
+	mainpkg.AddTestLib(testlib)
 	mainpkg.AddUnittest(maintest)
 	return mainpkg
 }
